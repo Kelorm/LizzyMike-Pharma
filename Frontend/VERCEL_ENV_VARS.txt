@@ -1,0 +1,17 @@
+# Vercel Frontend Environment Variables
+# Copy these to your Vercel project → Settings → Environment Variables
+
+REACT_APP_API_URL=https://your-app.railway.app
+REACT_APP_ENVIRONMENT=production
+REACT_APP_VERSION=1.0.0
+GENERATE_SOURCEMAP=false
+NODE_ENV=production
+
+# IMPORTANT:
+# 1. Replace "your-app.railway.app" with your actual Railway backend URL
+# 2. Make sure to set these for "Production" environment
+# 3. Redeploy your Vercel project after adding these variables
+
+
+
+

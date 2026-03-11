@@ -1,0 +1,139 @@
+{% extends "admin/index.html" %}
+{% load i18n static %}
+
+{% block content %}
+<div id="content-main">
+    <div class="dashboard">
+        <div class="module">
+            <h2>{% trans 'Authentication & Authorization' %}</h2>
+            <table class="dashboard-table">
+                <tbody>
+                    {% for model in auth_models %}
+                    <tr class="model-{{ model.object_name|lower }}">
+                        <th scope="row">
+                            <a href="{{ model.admin_url }}">{{ model.name }}</a>
+                        </th>
+                        <td>
+                            {% if model.add_url %}
+                                <a href="{{ model.add_url }}" class="addlink">
+                                    {% blocktrans with name=model.name %}Add {{ name }}{% endblocktrans %}
+                                </a>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if model.admin_url %}
+                                <a href="{{ model.admin_url }}" class="changelink">
+                                    {% blocktrans with name=model.name %}Change {{ name }}{% endblocktrans %}
+                                </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3">{% trans 'No authentication models available.' %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="module">
+            <h2>{% trans 'Pharmacy Management' %}</h2>
+            <table class="dashboard-table">
+                <tbody>
+                    {% for model in pharmacy_models %}
+                    <tr class="model-{{ model.object_name|lower }}">
+                        <th scope="row">
+                            <a href="{{ model.admin_url }}">{{ model.name }}</a>
+                        </th>
+                        <td>
+                            {% if model.add_url %}
+                                <a href="{{ model.add_url }}" class="addlink">
+                                    {% blocktrans with name=model.name %}Add {{ name }}{% endblocktrans %}
+                                </a>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if model.admin_url %}
+                                <a href="{{ model.admin_url }}" class="changelink">
+                                    {% blocktrans with name=model.name %}Change {{ name }}{% endblocktrans %}
+                                </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3">{% trans 'No pharmacy models available.' %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+.dashboard .module {
+    margin-bottom: 30px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.dashboard .module h2 {
+    background: #417690;
+    color: white;
+    padding: 10px 15px;
+    margin: 0;
+    font-size: 14px;
+    font-weight: bold;
+    border-radius: 4px 4px 0 0;
+}
+
+.dashboard-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.dashboard-table th,
+.dashboard-table td {
+    padding: 8px 15px;
+    border-bottom: 1px solid #eee;
+    text-align: left;
+}
+
+.dashboard-table th {
+    font-weight: bold;
+    width: 40%;
+}
+
+.dashboard-table td {
+    width: 30%;
+}
+
+.dashboard-table tr:hover {
+    background-color: #f8f8f8;
+}
+
+.addlink, .changelink {
+    font-size: 11px;
+    text-decoration: none;
+    padding: 3px 8px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+.addlink {
+    background: #5b80b2;
+    color: white;
+}
+
+.changelink {
+    background: #417690;
+    color: white;
+}
+
+.addlink:hover, .changelink:hover {
+    opacity: 0.8;
+}
+</style>
+{% endblock %}

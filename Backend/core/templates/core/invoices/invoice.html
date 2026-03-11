@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Invoice #{{ sale.id }}</title>
+    <style>
+        /* Your invoice styles */
+        body { font-family: Arial, sans-serif; }
+        .header { text-align: center; }
+        .invoice-details { float: right; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 8px; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>LizzyMike Pharmacy</h1>
+        <p>123 Pharmacy St, Medical City</p>
+        <p>Phone: (123) 456-7890</p>
+    </div>
+
+    <div class="invoice-details">
+        <h2>Invoice #{{ sale.id }}</h2>
+        <p>Date: {{ sale.date }}</p>
+    </div>
+
+    <div class="customer-info">
+        <h3>Customer Information</h3>
+        <p>{{ sale.customer.name }}</p>
+        <p>{{ sale.customer.address }}</p>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Medication</th>
+                <th>Quantity</th>
+                <th>Unit Price</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in sale.items.all %}
+            <tr>
+                <td>{{ item.medication.name }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>GHS {{ item.price }}</td>
+                <td>GHS {{ item.line_total }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="3" style="text-align: right;">Subtotal:</td>
+                <td>GHS {{ sale.subtotal }}</td>
+            </tr>
+            <tr>
+                <td colspan="3" style="text-align: right;">Tax:</td>
+                <td>GHS {{ sale.tax }}</td>
+            </tr>
+            <tr>
+                <td colspan="3" style="text-align: right;"><strong>Total:</strong></td>
+                <td><strong>GHS {{ sale.total }}</strong></td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <div class="footer">
+        <p>Payment Method: {{ sale.payment_method }}</p>
+        <p>Thank you for your business!</p>
+    </div>
+</body>
+</html>

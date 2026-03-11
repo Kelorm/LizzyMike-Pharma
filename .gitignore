@@ -1,0 +1,46 @@
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.log
+
+# Python / Django
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+db.sqlite3
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Django static/media
+staticfiles/
+media/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Node / frontend
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# IDE / tooling
+.idea/
+.vscode/
+*.code-workspace
+

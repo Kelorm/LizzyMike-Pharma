@@ -1,0 +1,395 @@
+{% load pharmacy_extras %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Invoice #{{ sale.id }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 20mm;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            margin: 0;
+            padding: 0;
+            background: white;
+            color: #333;
+        }
+        
+        .invoice {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #4a86e8;
+            padding-bottom: 20px;
+        }
+        
+        .company-info {
+            flex: 2;
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4a86e8;
+            margin-bottom: 5px;
+        }
+        
+        .company-name {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .company-details {
+            font-size: 11px;
+            color: #666;
+        }
+        
+        .invoice-info {
+            flex: 1;
+            text-align: right;
+        }
+        
+        .invoice-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4a86e8;
+            margin-bottom: 10px;
+        }
+        
+        .invoice-details {
+            font-size: 11px;
+        }
+        
+        .customer-section {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+        
+        .customer-info, .invoice-meta {
+            flex: 1;
+        }
+        
+        .section-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #4a86e8;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        
+        .items-table th {
+            background-color: #f8f9fa;
+            text-align: left;
+            padding: 12px 15px;
+            font-weight: bold;
+            color: #4a86e8;
+            border-bottom: 2px solid #4a86e8;
+        }
+        
+        .items-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .items-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        .items-table tr:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .totals-section {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 30px;
+        }
+        
+        .totals-table {
+            width: 300px;
+            border-collapse: collapse;
+        }
+        
+        .totals-table td {
+            padding: 8px 15px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .totals-table tr:last-child {
+            font-weight: bold;
+            font-size: 14px;
+            border-top: 2px solid #4a86e8;
+            background-color: #f8f9fa;
+        }
+        
+        .payment-info {
+            margin-bottom: 30px;
+        }
+        
+        .payment-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .payment-method, .transaction-details {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            color: #666;
+            font-size: 11px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+        
+        .thank-you {
+            font-size: 14px;
+            font-weight: bold;
+            color: #4a86e8;
+            margin-bottom: 10px;
+        }
+        
+        .barcode-section {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .barcode {
+            display: inline-block;
+            padding: 10px;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .barcode-lines {
+            height: 40px;
+            background: repeating-linear-gradient(
+                90deg,
+                #000 0px,
+                #000 2px,
+                transparent 2px,
+                transparent 4px
+            );
+            margin-bottom: 5px;
+        }
+        
+        .barcode-text {
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+        }
+        
+        .prescription-notes {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .prescription-notes h4 {
+            color: #856404;
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+            }
+            
+            .invoice {
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="invoice">
+        <!-- Header -->
+        <div class="header">
+            <div class="company-info">
+                <div class="logo">LIZZYMIKE</div>
+                <div class="company-name">LizzyMike Pharmacy</div>
+                <div class="company-details">
+                    123 Healthcare Street<br>
+                    Medical City, Ghana 00233<br>
+                    Phone: (233) 123-456-7890<br>
+                    Email: info@lizzymikepharmacy.com<br>
+                    Website: www.lizzymikepharmacy.com
+                </div>
+            </div>
+            <div class="invoice-info">
+                <div class="invoice-title">INVOICE</div>
+                <div class="invoice-details">
+                    <strong>Invoice #:</strong> {{ sale.id|slice:":12" }}<br>
+                    <strong>Date:</strong> {{ sale.date|date:"F j, Y" }}<br>
+                    <strong>Time:</strong> {{ sale.date|date:"h:i A" }}<br>
+                    <strong>Transaction ID:</strong> {{ sale.id|slice:":8" }}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Customer and Invoice Info -->
+        <div class="customer-section">
+            <div class="customer-info">
+                <div class="section-title">BILL TO</div>
+                <strong>{{ sale.customer_name }}</strong><br>
+                {% if sale.customer.phone %}
+                Phone: {{ sale.customer.phone }}<br>
+                {% endif %}
+                {% if sale.customer.email %}
+                Email: {{ sale.customer.email }}<br>
+                {% endif %}
+                {% if sale.customer.address %}
+                Address: {{ sale.customer.address }}<br>
+                {% endif %}
+                {% if sale.customer.insurance %}
+                Insurance: {{ sale.customer.insurance }}
+                {% endif %}
+            </div>
+            <div class="invoice-meta">
+                <div class="section-title">INVOICE DETAILS</div>
+                <strong>Invoice Date:</strong> {{ sale.date|date:"F j, Y" }}<br>
+                <strong>Due Date:</strong> {{ sale.date|date:"F j, Y" }}<br>
+                <strong>Payment Method:</strong> {{ sale.payment_method|title }}<br>
+                <strong>Cashier:</strong> {{ request.user.get_full_name|default:request.user.username }}
+            </div>
+        </div>
+        
+        <!-- Prescription Notes -->
+        {% if sale.notes %}
+        <div class="prescription-notes">
+            <h4>Prescription Notes</h4>
+            {{ sale.notes }}
+        </div>
+        {% endif %}
+        
+        <!-- Items Table -->
+        <div class="section-title">ITEMS PURCHASED</div>
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Description</th>
+                    <th>Quantity</th>
+                    <th>Unit Price</th>
+                    <th>Discount</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in sale.items.all %}
+                <tr>
+                    <td><strong>{{ item.medication_name }}</strong></td>
+                    <td>{{ item.medication.category|default:"General" }}</td>
+                    <td>{{ item.qty }}</td>
+                    <td>GHS {{ item.price|floatformat:2 }}</td>
+                    <td>GHS {{ item.discount|default:0|floatformat:2 }}</td>
+                    <td><strong>GHS {{ item.price|floatformat:2 }}</strong></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <!-- Totals -->
+        <div class="totals-section">
+            <table class="totals-table">
+                <tr>
+                    <td>Subtotal:</td>
+                    <td style="text-align: right;">GHS {{ sale.subtotal|floatformat:2 }}</td>
+                </tr>
+                {% if sale.discount_total > 0 %}
+                <tr>
+                    <td>Discount:</td>
+                    <td style="text-align: right;">-GHS {{ sale.discount_total|floatformat:2 }}</td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td>Tax:</td>
+                    <td style="text-align: right;">GHS 0.00</td>
+                </tr>
+                <tr>
+                    <td><strong>TOTAL:</strong></td>
+                    <td style="text-align: right;"><strong>GHS {{ sale.total|floatformat:2 }}</strong></td>
+                </tr>
+            </table>
+        </div>
+        
+        <!-- Payment Information -->
+        <div class="payment-info">
+            <div class="section-title">PAYMENT INFORMATION</div>
+            <div class="payment-grid">
+                <div class="payment-method">
+                    <h4>Payment Method</h4>
+                    <strong>{{ sale.payment_method|title }}</strong><br>
+                    Amount Paid: GHS {{ sale.total|floatformat:2 }}<br>
+                    Change: GHS 0.00
+                </div>
+                <div class="transaction-details">
+                    <h4>Transaction Details</h4>
+                    Transaction ID: {{ sale.id|slice:":12" }}<br>
+                    Date: {{ sale.date|date:"F j, Y h:i A" }}<br>
+                    Status: <span style="color: green; font-weight: bold;">PAID</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Barcode -->
+        <div class="barcode-section">
+            <div class="barcode">
+                <div class="barcode-lines"></div>
+                <div class="barcode-text">{{ sale.id|slice:":12" }}</div>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <div class="thank-you">
+                Thank you for choosing LizzyMike Pharmacy!
+            </div>
+            <p>
+                For questions or concerns about this invoice, please contact us:<br>
+                Phone: (233) 123-456-7890 | Email: billing@lizzymikepharmacy.com<br>
+                Business Hours: Monday - Friday 8:00 AM - 8:00 PM, Saturday 9:00 AM - 6:00 PM
+            </p>
+            <p style="margin-top: 20px; font-size: 10px; color: #999;">
+                This is a computer-generated invoice. No signature required.
+            </p>
+        </div>
+    </div>
+    
+    <script>
+        // Auto-print functionality
+        window.onload = function() {
+            // Uncomment the line below to enable auto-print
+            // window.print();
+        };
+    </script>
+</body>
+</html> 

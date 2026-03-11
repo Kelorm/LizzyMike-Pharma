@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Receipt #{{ sale.id }}</title>
+    <style>
+        /* Dynamic styles - colors can come from settings */
+        :root {
+            --primary-color: #4a86e8;
+            --secondary-color: #f8f9fa;
+            --text-color: #333;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-color);
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+        }
+        
+        .header {
+            text-align: center;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--primary-color);
+            margin-bottom: 30px;
+        }
+        
+        .pharmacy-name {
+            color: var(--primary-color);
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .invoice-details {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+        
+        .customer-info, .receipt-meta {
+            flex: 1;
+        }
+        
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        
+        .items-table th {
+            background-color: var(--secondary-color);
+            text-align: left;
+            padding: 12px 15px;
+        }
+        
+        .items-table td {
+            padding: 10px 15px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .totals-table {
+            width: 50%;
+            margin-left: auto;
+            border-collapse: collapse;
+        }
+        
+        .totals-table td {
+            padding: 8px 15px;
+        }
+        
+        .totals-table tr:last-child td {
+            font-weight: bold;
+            border-top: 2px solid var(--primary-color);
+        }
+        
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            color: #777;
+            font-size: 14px;
+        }
+        
+        @media print {
+            body {
+                padding: 0;
+            }
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <script>
+      window.onload = function() {
+        window.print();
+      };
+    </script>
+    <div class="header">
+        <div class="pharmacy-name">LizzyMike Pharmacy</div>
+        <p>123 Pharmacy St, Medical City | Phone: (123) 456-7890</p>
+    </div>
+
+    <div class="invoice-details">
+        <div class="customer-info">
+            <h3>Customer Information</h3>
+            <p><strong>Name:</strong> {{ sale.customer_name }}</p>
+            <p><strong>Phone:</strong> {{ sale.customer.phone }}</p>
+            <p><strong>Address:</strong> {{ sale.customer.address }}</p>
+        </div>
+        
+        <div class="receipt-meta">
+            <h2>Receipt #{{ sale.id }}</h2>
+            <p><strong>Date:</strong> {{ sale.date }}</p>
+            <p><strong>Payment Method:</strong> {{ sale.payment_method }}</p>
+        </div>
+    </div>
+
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th>Medication</th>
+                <th>Quantity</th>
+                <th>Unit Price</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in sale.items.all %}
+            <tr>
+                <td>{{ item.medication_name }}</td>
+                <td>{{ item.qty }}</td>
+                <td>GHS {{ item.price }}</td>
+                <td>GHS {% widthratio item.price 1 item.qty %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <table class="totals-table">
+        <tr>
+            <td>Subtotal:</td>
+            <td>GHS {{ sale.subtotal }}</td>
+        </tr>
+        <tr>
+            <td>Discount:</td>
+            <td>GHS {{ sale.discount_total }}</td>
+        </tr>
+        <tr>
+            <td><strong>Total:</strong></td>
+            <td><strong>GHS {{ sale.total }}</strong></td>
+        </tr>
+    </table>
+
+    <div class="footer">
+        <p>Thank you for your business!</p>
+        <p>Generated on {% now "F j, Y H:i" %}</p>
+        <div class="no-print">
+            <button onclick="window.print()">Print Receipt</button>
+        </div>
+    </div>
+</body>
+</html>

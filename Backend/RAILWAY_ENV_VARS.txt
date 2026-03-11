@@ -1,0 +1,26 @@
+# Railway Backend Environment Variables
+# Copy these to your Railway backend service → Variables tab
+
+DJANGO_SETTINGS_MODULE=pharmasys.settings_free
+SECRET_KEY=django-insecure-pharmasys-production-key-2024-very-secure-random-string-123456789
+DEBUG=False
+ALLOWED_HOSTS=your-app.railway.app
+DB_NAME=railway
+DB_USER=postgres
+DB_PASSWORD=(Get from Railway database service)
+DB_HOST=(Get from Railway database service)
+DB_PORT=5432
+CORS_ALLOWED_ORIGINS=https://your-frontend.vercel.app
+CSRF_TRUSTED_ORIGINS=https://your-frontend.vercel.app
+LOW_STOCK_THRESHOLD=0.2
+EXPIRY_WARNING_MONTHS=3
+TAX_RATE=0.03
+
+# IMPORTANT: 
+# 1. Replace "your-app.railway.app" with your actual Railway domain
+# 2. Replace "your-frontend.vercel.app" with your actual Vercel domain
+# 3. Get DB_PASSWORD and DB_HOST from your Railway PostgreSQL service
+
+
+
+

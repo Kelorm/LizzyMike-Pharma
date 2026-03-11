@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Receipt #{{ sale.id }}</title>
+    <style>
+        @page {
+            size: 80mm 297mm;
+            margin: 0;
+        }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.2;
+            margin: 0;
+            padding: 10px;
+            background: white;
+            color: black;
+        }
+        
+        .receipt {
+            width: 100%;
+            max-width: 80mm;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #000;
+            padding-bottom: 10px;
+        }
+        
+        .logo {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .pharmacy-name {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .store-info {
+            font-size: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .transaction-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .items-section {
+            margin-bottom: 15px;
+        }
+        
+        .item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 11px;
+        }
+        
+        .item-name {
+            flex: 2;
+        }
+        
+        .item-qty {
+            flex: 1;
+            text-align: center;
+        }
+        
+        .item-price {
+            flex: 1;
+            text-align: right;
+        }
+        
+        .item-total {
+            flex: 1;
+            text-align: right;
+        }
+        
+        .summary {
+            border-top: 1px solid #000;
+            padding-top: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 3px;
+            font-size: 11px;
+        }
+        
+        .total-row {
+            font-weight: bold;
+            font-size: 12px;
+            border-top: 1px solid #000;
+            padding-top: 5px;
+            margin-top: 5px;
+        }
+        
+
+        
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            border-top: 1px solid #000;
+            padding-top: 10px;
+        }
+        
+        .thank-you {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .barcode {
+            text-align: center;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+        }
+        
+        .barcode-line {
+            height: 2px;
+            background: black;
+            margin: 1px 0;
+        }
+        
+        .barcode-text {
+            margin-top: 5px;
+            font-size: 8px;
+        }
+        
+        .logo-image {
+            width: 50px;
+            height: 50px;
+            margin: 0 auto 10px;
+            display: block;
+            object-fit: contain;
+        }
+        
+        .divider {
+            border-top: 1px dashed #000;
+            margin: 10px 0;
+        }
+        
+        .customer-info {
+            margin-bottom: 15px;
+            font-size: 10px;
+        }
+        
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt">
+        <!-- Header -->
+        <div class="header">
+            <img src="/static/images/logo.png" alt="LizzyMike Logo" class="logo-image">
+            <div class="pharmacy-name">LizzyMike Pharmacy</div>
+            <div class="store-info">
+                Kasoa-Obom Road<br>
+                Semenhyia, Ghana<br>
+                Phone: 0545241769
+            </div>
+        </div>
+        
+        <!-- Transaction Info -->
+        <div class="transaction-info">
+            <div>
+                Register #1<br>
+                Cashier #001<br>
+                Receipt #{{ sale.id|slice:":12" }}
+            </div>
+            <div style="text-align: right;">
+                {{ sale.date|date:"m/d/Y" }}<br>
+                {{ sale.date|date:"h:i A" }}<br>
+                Transaction #{{ sale.id|slice:":8" }}
+            </div>
+        </div>
+        
+        <!-- Customer Info -->
+        <div class="customer-info">
+            <strong>Customer:</strong> {{ sale.customer_name }}<br>
+            {% if sale.customer.phone %}
+            <strong>Phone:</strong> {{ sale.customer.phone }}<br>
+            {% endif %}
+        </div>
+        
+        <!-- Items Section -->
+        <div class="items-section">
+            <div style="text-align: center; margin-bottom: 10px; font-weight: bold; font-size: 12px;">
+                ITEMS PURCHASED
+            </div>
+            
+            {% for item in sale.items.all %}
+            <div class="item">
+                <div class="item-name">{{ item.medication_name }}</div>
+                <div class="item-qty">{{ item.qty }}</div>
+                <div class="item-price">GHS {{ item.price|floatformat:2 }}</div>
+                <div class="item-total">GHS {{ item.price|floatformat:2 }}</div>
+            </div>
+            {% endfor %}
+            
+            <div style="text-align: center; margin-top: 10px; font-size: 10px;">
+                {{ sale.items.count }} Items
+            </div>
+        </div>
+        
+        <!-- Summary -->
+        <div class="summary">
+            <div class="summary-row">
+                <span>Subtotal:</span>
+                <span>GHS {{ sale.subtotal|floatformat:2 }}</span>
+            </div>
+            {% if sale.discount_total > 0 %}
+            <div class="summary-row">
+                <span>Discount:</span>
+                <span>-GHS {{ sale.discount_total|floatformat:2 }}</span>
+            </div>
+            {% endif %}
+            <div class="summary-row">
+                <span>Tax:</span>
+                <span>GHS 0.00</span>
+            </div>
+            <div class="summary-row total-row">
+                <span>TOTAL:</span>
+                <span>GHS {{ sale.total|floatformat:2 }}</span>
+            </div>
+        </div>
+        
+
+        
+        <!-- Footer -->
+        <div class="footer">
+            <div class="thank-you">
+                THANK YOU FOR SHOPPING AT<br>
+                LIZZYMIKE PHARMACY
+            </div>
+            
+            <!-- Barcode -->
+            <div class="barcode">
+                <div class="barcode-line"></div>
+                <div class="barcode-line"></div>
+                <div class="barcode-line"></div>
+                <div class="barcode-line"></div>
+                <div class="barcode-line"></div>
+                <div class="barcode-text">{{ sale.id|slice:":12" }}</div>
+            </div>
+            
+            <div style="font-size: 9px; margin-top: 10px;">
+                <div>Designed by Kelorm DevTech Solutions</div>
+                <div>Tel: 0543306857</div>
+            </div>
+        </div>
+        
+        <!-- Divider for tear-off -->
+        <div class="divider"></div>
+        
+        <!-- Customer Copy -->
+        <div style="text-align: center; font-size: 10px; margin-top: 10px;">
+            <strong>CUSTOMER COPY</strong><br>
+            Keep this receipt for your records
+        </div>
+    </div>
+    
+    <script>
+        // Auto-print functionality
+        window.onload = function() {
+            // Uncomment the line below to enable auto-print
+            // window.print();
+        };
+    </script>
+</body>
+</html> 
