@@ -328,11 +328,11 @@ if SENTRY_DSN:
         send_default_pii=True,
     )
 
-# Cache configuration
+# Cache configuration (LocMemCache for environments without Redis)
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': get_env('REDIS_URL', 'redis://localhost:6379/1'),
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
     }
 }
 
