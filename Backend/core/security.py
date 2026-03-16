@@ -87,6 +87,13 @@ class SecurityMiddleware:
             ip = request.META.get('REMOTE_ADDR')
         return ip
 
+
+def get_client_ip(request: HttpRequest) -> str | None:
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        return x_forwarded_for.split(',')[0]
+    return request.META.get('REMOTE_ADDR')
+
 class AuditLogger:
     """Audit logging for security events"""
     
@@ -160,7 +167,7 @@ class SessionSecurity:
             return True
         
         # Check for session hijacking
-        current_ip = SecurityMiddleware().get_client_ip(request)
+        current_ip = get_client_ip(request)
         stored_ip = request.session.get('ip_address')
         
         if stored_ip and stored_ip != current_ip:
