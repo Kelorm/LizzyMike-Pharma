@@ -23,7 +23,7 @@ SECRET_KEY = get_env('SECRET_KEY', 'django-insecure-w&ijx5cr!*htjk@fr7#lw@u%93dz
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = get_env('DEBUG', False, bool)
 
-ALLOWED_HOSTS = get_csv('ALLOWED_HOSTS', 'localhost,127.0.0.1')
+ALLOWED_HOSTS = get_csv('ALLOWED_HOSTS', 'localhost,127.0.0.1,lizzymike-pharma.onrender.com')
 
 # --- Security settings ---
 SECURE_HSTS_SECONDS = 31536000  # 1 year
