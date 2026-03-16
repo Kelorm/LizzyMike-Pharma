@@ -59,16 +59,19 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
+    # Core Django session/auth must run before custom middleware that uses request.user
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    # Custom security middleware
     'core.middleware.SecurityMiddlewareWrapper',
     'core.middleware.RateLimitMiddleware',
     'core.middleware.SessionSecurityMiddleware',
     'core.middleware.AuditMiddleware',
     'core.middleware.HealthCheckMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
+    # Remaining Django middleware
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
