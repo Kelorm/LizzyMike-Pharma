@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, X, Search, AlertCircle, CheckCircle, Package } from 'lucide-react';
 import { Medication, Restock } from '../../types';
 import { useMedicationContext } from '../../contexts/MedicationContext';
+import { API_BASE_URL } from '../../utils/axios';
 
 interface RestockFormProps {
   onClose: () => void;
@@ -101,7 +102,7 @@ const RestockForm = ({ onClose, onRestockSuccess, medication }: RestockFormProps
       console.log('Sending restock data:', restockData);
 
       // Call API to create restock
-      const response = await fetch('http://127.0.0.1:8000/api/restocks/', {
+      const response = await fetch(`${API_BASE_URL}/api/restocks/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

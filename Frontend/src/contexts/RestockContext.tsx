@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Restock } from '../types';
+import { API_BASE_URL } from '../utils/axios';
 
 interface RestockContextType {
   restocks: Restock[];
@@ -44,7 +45,7 @@ export const RestockProvider: React.FC<RestockProviderProps> = ({ children }) =>
     setError(null);
     
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/restocks/', {
+      const response = await fetch(`${API_BASE_URL}/api/restocks/`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
@@ -66,7 +67,7 @@ export const RestockProvider: React.FC<RestockProviderProps> = ({ children }) =>
 
   const createRestock = async (restockData: Partial<Restock>): Promise<Restock> => {
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/restocks/', {
+      const response = await fetch(`${API_BASE_URL}/api/restocks/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -90,7 +91,7 @@ export const RestockProvider: React.FC<RestockProviderProps> = ({ children }) =>
 
   const updateRestock = async (id: string, restockData: Partial<Restock>): Promise<Restock> => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/restocks/${id}/`, {
+      const response = await fetch(`${API_BASE_URL}/api/restocks/${id}/`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -114,7 +115,7 @@ export const RestockProvider: React.FC<RestockProviderProps> = ({ children }) =>
 
   const deleteRestock = async (id: string): Promise<void> => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/restocks/${id}/`, {
+      const response = await fetch(`${API_BASE_URL}/api/restocks/${id}/`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`

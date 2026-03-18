@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Package, Calendar, DollarSign, TrendingUp, Filter, Search, X } from 'lucide-react';
 import { Restock } from '../../types';
+import { API_BASE_URL } from '../../utils/axios';
 
 interface RestockHistoryProps {
   onClose: () => void;
@@ -22,7 +23,7 @@ const RestockHistory = ({ onClose, onRestockClick }: RestockHistoryProps) => {
 
   const fetchRestocks = async () => {
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/restocks/', {
+      const response = await fetch(`${API_BASE_URL}/api/restocks/`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }

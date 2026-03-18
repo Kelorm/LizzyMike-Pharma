@@ -215,7 +215,6 @@ const ReceiptGenerator: React.FC<ReceiptGeneratorProps> = ({ sale, customer, onC
   const handleDownload = async () => {
     setLoading(true);
     try {
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8000';
       const response = await fetch(`${API_BASE_URL}/api/sales/${sale.id}/receipt/`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
+import { API_BASE_URL } from './axios';
 
 // Verify JWT token structure
 export const isValidToken = (token: string): boolean => {
@@ -47,7 +48,7 @@ export const refreshToken = async (): Promise<boolean> => {
       return false;
     }
 
-    const res = await axios.post('http://127.0.0.1:8000/api/token/refresh/', 
+    const res = await axios.post(`${API_BASE_URL}/api/token/refresh/`,
       { refresh },
       {
         headers: { 'Content-Type': 'application/json' },

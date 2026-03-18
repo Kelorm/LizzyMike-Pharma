@@ -13,6 +13,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import { useMedicationContext } from '../contexts/MedicationContext';
 import ReceiptGenerator from '../components/ReceiptGenerator';
 import { useCustomerContext } from '../contexts/CustomerContext';
+import { API_BASE_URL } from '../utils/axios';
 
 const COLORS = ['#34d399', '#60a5fa', '#fbbf24', '#a78bfa', '#f472b6', '#f87171'];
 
@@ -332,7 +333,7 @@ const Sales: React.FC = () => {
                           <FileText className="h-4 w-4" />
                         </button>
                         <a
-                          href={`http://127.0.0.1:8000/receipt/${sale.id}/`}
+                          href={`${API_BASE_URL}/receipt/${sale.id}/`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="p-1 hover:bg-gray-100 rounded ml-2"
