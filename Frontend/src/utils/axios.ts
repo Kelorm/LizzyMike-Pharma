@@ -1,9 +1,11 @@
 import axios from 'axios';
 
-export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8000';
+// Ensure a safe base URL fallback during build/dev if env var is missing
+export const API_BASE_URL = (process.env.REACT_APP_API_URL || '').replace(/\/$/, '');
+console.log('API URL:', API_BASE_URL);
 
 const apiClient = axios.create({
-  baseURL: `${API_BASE_URL}/api`,
+  baseURL: API_BASE_URL ? `${API_BASE_URL}/api` : '/api',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'

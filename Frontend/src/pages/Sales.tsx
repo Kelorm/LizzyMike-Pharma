@@ -15,6 +15,8 @@ import ReceiptGenerator from '../components/ReceiptGenerator';
 import { useCustomerContext } from '../contexts/CustomerContext';
 import { API_BASE_URL } from '../utils/axios';
 
+const API_URL = API_BASE_URL || process.env.REACT_APP_API_URL || '';
+
 const COLORS = ['#34d399', '#60a5fa', '#fbbf24', '#a78bfa', '#f472b6', '#f87171'];
 
 const PaymentMethodBadge: React.FC<{ method: string }> = ({ method }) => {
@@ -333,7 +335,7 @@ const Sales: React.FC = () => {
                           <FileText className="h-4 w-4" />
                         </button>
                         <a
-                          href={`${API_BASE_URL}/receipt/${sale.id}/`}
+                          href={`${API_URL || ''}/receipt/${sale.id}/`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="p-1 hover:bg-gray-100 rounded ml-2"

@@ -3,6 +3,9 @@ import { Printer, Download, Share2, FileText, Building, Phone, Mail, User, Calen
 import { Sale, Customer } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
+import { API_BASE_URL } from '../utils/axios';
+
+const API_URL = API_BASE_URL || process.env.REACT_APP_API_URL || '';
 
 interface ReceiptGeneratorProps {
   sale: Sale;
@@ -215,7 +218,8 @@ const ReceiptGenerator: React.FC<ReceiptGeneratorProps> = ({ sale, customer, onC
   const handleDownload = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/sales/${sale.id}/receipt/`);
+      const endpoint = `${API_URL || ''}/api/sales/${sale.id}/receipt/`;
+      const response = await fetch(endpoint);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
