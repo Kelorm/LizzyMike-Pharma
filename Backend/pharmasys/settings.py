@@ -1,6 +1,7 @@
 from pathlib import Path
 from datetime import timedelta
 from decimal import Decimal
+import dj_database_url
 import os
 import uuid
 
@@ -73,13 +74,9 @@ WSGI_APPLICATION = 'pharmasys.wsgi.application'
 
 # Database
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-        'OPTIONS': {
-            'timeout': 20,  # Add timeout to prevent locking issues
-        }
-    }
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL')
+    )
 }
 
 # Password validation
@@ -170,6 +167,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:5173",
+    "https://lizzymikepharma.netlify.app"
 ]
 
 CSRF_TRUSTED_ORIGINS = [
