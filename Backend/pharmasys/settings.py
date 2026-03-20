@@ -163,7 +163,9 @@ SIMPLE_JWT = {
 AUTH_USER_MODEL = 'core.User'  # Critical for custom user
 
 # CORS Configuration - Expanded for development
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_ORIGINS = [
+    "https://lizzymikepharma.netlify.app",
+]
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
