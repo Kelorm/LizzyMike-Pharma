@@ -10,7 +10,7 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json'
   },
-  withCredentials: true,
+  // Removed withCredentials: true - conflicts with CORS_ALLOW_ALL_ORIGINS
 });
 
 // Track refresh attempts to prevent infinite loops

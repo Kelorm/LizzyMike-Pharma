@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import { Medication } from '../types';
 import api from '../services/api';
+import { useAuth } from './AuthContext';
 
 interface StockContextType {
   stockLevels: { [medicationId: string]: number };
@@ -31,6 +32,7 @@ export const StockContextProvider: React.FC<{ children: React.ReactNode }> = ({
   const [error, setError] = useState<string | null>(null);
   const [reservedStock, setReservedStock] = useState<{ [medicationId: string]: number }>({});
   const [medications, setMedications] = useState<Medication[]>([]);
+  const { isAuthenticated } = useAuth();
 
   const fetchStockLevels = useCallback(async () => {
     try {
@@ -55,15 +57,22 @@ export const StockContextProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
+
     fetchStockLevels();
     
-    // Set up polling for real-time updates
+    // Set up polling for real-time updates only when authenticated
     const interval = setInterval(() => {
-      fetchStockLevels();
+      if (isAuthenticated) {
+        fetchStockLevels();
+      }
     }, 30000); // Refresh every 30 seconds
 
     return () => clearInterval(interval);
-  }, [fetchStockLevels]);
+  }, [fetchStockLevels, isAuthenticated]);
 
   const checkStockLevel = useCallback((medicationId: string): number => {
     const currentStock = stockLevels[medicationId] || 0;
