@@ -15,7 +15,7 @@ SECRET_KEY = 'django-insecure-w&ijx5cr!*htjk@fr7#lw@u%93dzv0)ev27#aib00jh&*zdzw7
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = [".onrender.com", "localhost", "127.0.0.1"]
+ALLOWED_HOSTS = [".onrender.com", "lizzymikepharma.netlify.app", "localhost", "127.0.0.1"]
 
 # --- Security settings ---
 SECURE_HSTS_SECONDS = 31536000  # 1 year
@@ -169,6 +169,7 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CSRF_TRUSTED_ORIGINS = [
+    "https://lizzymikepharma.netlify.app",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:5173",
@@ -185,13 +186,6 @@ CSRF_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_HTTPONLY = False
 SESSION_COOKIE_HTTPONLY = True
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "https://lizzymikepharma.netlify.app",
-]
 
 # Session settings
 SESSION_COOKIE_AGE = 1209600  # 2 weeks in seconds
