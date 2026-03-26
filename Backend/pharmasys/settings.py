@@ -76,7 +76,8 @@ WSGI_APPLICATION = 'pharmasys.wsgi.application'
 # Database
 DATABASES = {
     'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL')
+        default=os.environ.get('DATABASE_URL'),
+        conn_max_age=600
     )
 }
 
@@ -164,6 +165,8 @@ SIMPLE_JWT = {
 AUTH_USER_MODEL = 'core.User'  # Critical for custom user
 
 # CORS Configuration - Expanded for development
+CORS_ALLOW_ALL_ORIGINS = True
+
 CORS_ALLOWED_ORIGINS = [
     "https://lizzymikepharma.netlify.app",
 ]
