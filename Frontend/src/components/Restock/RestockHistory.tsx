@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Package, Calendar, DollarSign, TrendingUp, Filter, Search, X } from 'lucide-react';
 import { Restock } from '../../types';
-import { API_BASE_URL } from '../../utils/axios';
+import api from '../../services/api';
 
 interface RestockHistoryProps {
   onClose: () => void;
+  medicationId?: string;
   onRestockClick?: (restock: Restock) => void;
 }
 
-const RestockHistory = ({ onClose, onRestockClick }: RestockHistoryProps) => {
+const RestockHistory = ({ onClose, medicationId, onRestockClick }: RestockHistoryProps) => {
   const [restocks, setRestocks] = useState<Restock[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -19,20 +20,15 @@ const RestockHistory = ({ onClose, onRestockClick }: RestockHistoryProps) => {
 
   useEffect(() => {
     fetchRestocks();
-  }, []);
+  }, [medicationId]);
 
   const fetchRestocks = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/restocks/`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setRestocks(data.results || data);
-      }
+      const params: Record<string, string> = {};
+      if (medicationId) params.medication = medicationId;
+      const response = await api.restock.list(params);
+      const data = response.data;
+      setRestocks(Array.isArray(data) ? data : data.results || []);
     } catch (error) {
       console.error('Failed to fetch restocks:', error);
     } finally {

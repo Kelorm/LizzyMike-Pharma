@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import apiClient from '../utils/axios';
+import apiClient, { ensureCsrfCookie } from '../utils/axios';
+import { getHomePathForRole } from '../utils/permissions';
 import { Eye, EyeOff, User, Lock, Shield, CheckCircle } from 'lucide-react';
 import LizzyMikeLogo from '../assets/LizzyMikeLogo.png';
 
@@ -16,27 +17,24 @@ const LoginPage: React.FC = () => {
   const submitCountRef = useRef(0);
   const { user, isLoading: authLoading, login } = useAuth();
 
-  // Redirect authenticated users away from login page
+  // Redirect authenticated users to their role home
   React.useEffect(() => {
-    console.log('[Login] useEffect triggered - authLoading:', authLoading, 'user:', user ? user.username : 'null');
     if (!authLoading && user) {
-      console.log('[Login] User authenticated, navigating to dashboard');
-      navigate('/', { replace: true });
+      navigate(getHomePathForRole(user.role), { replace: true });
     }
   }, [authLoading, user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
+
     submitCountRef.current += 1;
-    
+
     if (isLoading) {
       return;
     }
 
     setError('');
     setIsLoading(true);
-    console.log('[Login] Form submitted for user:', username);
 
     if (!username.trim() || !password.trim()) {
       setError('Username and password are required');
@@ -45,30 +43,28 @@ const LoginPage: React.FC = () => {
     }
 
     try {
-      console.log('[Login] Making login API call...');
+      await ensureCsrfCookie();
       const response = await apiClient.post('/token/', {
         username: username.trim(),
-        password
+        password,
+        website: '', // honeypot — leave empty
       });
 
       if (response.status !== 200) {
         throw new Error('Login failed');
       }
 
-      const { access, refresh } = response.data;
-      console.log('[Login] Login API successful, calling AuthContext login...');
-      
-      // Use the AuthContext login function and wait for it to complete
-      await login(access, refresh);
-      console.log('[Login] AuthContext login completed');
-      
-      // Navigation will be handled by the useEffect above when user state changes
-      // No need to manually navigate here
-
+      // Auth is httpOnly cookie based; do not store JWT in JS
+      const profile = await login();
+      navigate(getHomePathForRole(profile.role), { replace: true });
     } catch (err: any) {
-      console.log('[Login] Login error:', err);
-      if (err.response?.data?.detail) {
-        setError(err.response.data.detail);
+      const detail = err.response?.data?.detail;
+      if (typeof detail === 'string') {
+        setError(detail);
+      } else if (Array.isArray(detail)) {
+        setError(detail.join(' '));
+      } else if (err.message && err.message !== 'Login failed') {
+        setError(err.message);
       } else {
         setError('Login failed. Please try again.');
       }
@@ -169,6 +165,19 @@ const LoginPage: React.FC = () => {
                 )}
               </button>
             </div>
+          </div>
+
+          {/* Honeypot — hidden from users, bots often fill it */}
+          <div aria-hidden="true" style={{ position: 'absolute', left: '-10000px', top: 'auto', width: 1, height: 1, overflow: 'hidden' }}>
+            <label htmlFor="website">Company website</label>
+            <input
+              id="website"
+              name="website"
+              type="text"
+              tabIndex={-1}
+              autoComplete="off"
+              defaultValue=""
+            />
           </div>
 
           {/* Remember me checkbox */}

@@ -1,7 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, User
+from django.contrib.admin.exceptions import NotRegistered
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
@@ -15,50 +16,13 @@ User = get_user_model()
 # ============================================================================
 
 class CustomUserAdmin(BaseUserAdmin):
-    """Enhanced User Administration with role-based management"""
+    """Enhanced User Administration"""
     
     # Display fields in the user list
-    list_display = ('username', 'email', 'full_name', 'role', 'is_active', 'is_staff', 'date_joined')
-    list_filter = ('role', 'is_active', 'is_staff', 'is_superuser', 'date_joined')
-    search_fields = ('username', 'email', 'full_name', 'phone')
+    list_display = ('username', 'email', 'is_active', 'is_staff', 'date_joined')
+    list_filter = ('is_active', 'is_staff', 'is_superuser', 'date_joined')
+    search_fields = ('username', 'email', 'first_name', 'last_name')
     ordering = ('-date_joined',)
-    
-    # Fieldsets for the user detail/edit page
-    fieldsets = (
-        ('Authentication', {
-            'fields': ('username', 'password')
-        }),
-        ('Personal Information', {
-            'fields': ('first_name', 'last_name', 'full_name', 'email', 'phone')
-        }),
-        ('Role & Permissions', {
-            'fields': ('role', 'is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
-            'classes': ('wide',)
-        }),
-        ('Important Dates', {
-            'fields': ('last_login', 'date_joined'),
-            'classes': ('collapse',)
-        }),
-    )
-    
-    # Fieldsets for adding a new user
-    add_fieldsets = (
-        ('Authentication', {
-            'classes': ('wide',),
-            'fields': ('username', 'email', 'password1', 'password2'),
-        }),
-        ('Personal Information', {
-            'classes': ('wide',),
-            'fields': ('full_name', 'phone'),
-        }),
-        ('Role Assignment', {
-            'classes': ('wide',),
-            'fields': ('role', 'is_active', 'is_staff'),
-        }),
-    )
-    
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related()
 
 class AuditTrailAdmin(admin.ModelAdmin):
     """Audit Trail for tracking user actions"""
@@ -79,6 +43,11 @@ class AuditTrailAdmin(admin.ModelAdmin):
         return request.user.is_superuser  # Only superusers can delete audit trails
 
 # Register Authentication & Authorization models
+# Unregister default User admin first, then register with custom admin
+try:
+    admin.site.unregister(User)
+except NotRegistered:
+    pass
 admin.site.register(User, CustomUserAdmin)
 admin.site.register(AuditTrail, AuditTrailAdmin)
 
@@ -202,9 +171,18 @@ class RestockAdmin(admin.ModelAdmin):
     list_display = ['medication_name', 'supplier', 'quantity', 'unit_cost', 'total_cost', 'batch_number', 'expiry_date', 'date_restocked']
     list_filter = ['supplier', 'date_restocked', 'expiry_date']
     search_fields = ['medication_name', 'supplier', 'batch_number']
-    readonly_fields = ['id', 'total_cost', 'date_restocked', 'created_at', 'updated_at']
+    readonly_fields = ['id', 'total_cost', 'date_restocked', 'updated_at']
     date_hierarchy = 'date_restocked'
-    
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
     fieldsets = (
         ('Basic Information', {
             'fields': ('medication', 'medication_name', 'quantity', 'unit_cost', 'total_cost')
@@ -213,7 +191,7 @@ class RestockAdmin(admin.ModelAdmin):
             'fields': ('supplier', 'batch_number', 'expiry_date')
         }),
         ('Additional Information', {
-            'fields': ('notes', 'date_restocked', 'created_at', 'updated_at'),
+            'fields': ('notes', 'date_restocked', 'updated_at'),
             'classes': ('collapse',)
         }),
     )

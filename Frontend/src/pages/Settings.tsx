@@ -1,8 +1,12 @@
 //src/pages/Settings.tsx
 
 import React, { useState, ReactNode } from 'react';
-import { Settings as SettingsIcon, Package, Bell, Cog } from 'lucide-react';
+import { Settings as SettingsIcon, Package, Bell, CalendarDays, Percent } from 'lucide-react';
 import SettingsModal from '../components/SettingsModal';
+import BusinessDayPanel from '../components/BusinessDayPanel';
+import TaxDiscountSettingsPanel from '../components/TaxDiscountSettingsPanel';
+import { useUserManagementPermissions } from '../hooks/usePermissions';
+import { usePermissions } from '../hooks/usePermissions';
 
 type SettingsCardProps = {
   title: string;
@@ -54,6 +58,8 @@ const Settings: React.FC = () => {
   const [lowStockAlerts, setLowStockAlerts] = useState(true);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'account' | 'pharmacy' | 'notifications' | 'security'>('account');
+  const { canViewUsers } = useUserManagementPermissions();
+  const { isAdmin } = usePermissions();
 
   const handleOpenSettingsModal = (tab: 'account' | 'pharmacy' | 'notifications' | 'security') => {
     setActiveTab(tab);
@@ -66,8 +72,34 @@ const Settings: React.FC = () => {
 
   const handleSaveSettings = (settings: any) => {
     console.log('Settings saved:', settings);
-    // TODO: Implement settings save logic
   };
+
+  const accountItems = [
+    ...(canViewUsers
+      ? [
+          {
+            title: 'User Accounts',
+            description: 'Create staff accounts and allow or disallow access',
+            onClick: () => handleOpenSettingsModal('account'),
+          },
+        ]
+      : []),
+    ...(isAdmin
+      ? [
+          {
+            title: 'Password & Security',
+            description: 'Update your login credentials',
+            onClick: () => handleOpenSettingsModal('security'),
+          },
+        ]
+      : [
+          {
+            title: 'My Account',
+            description: 'View profile and password options',
+            onClick: () => handleOpenSettingsModal('account'),
+          },
+        ]),
+  ];
 
   return (
     <div className="space-y-6">
@@ -77,18 +109,7 @@ const Settings: React.FC = () => {
         <SettingsCard 
           title="Account Settings"
           icon={<SettingsIcon className="h-5 w-5 text-blue-500" />}
-          items={[
-            {
-              title: "User Accounts",
-              description: "Manage system users and permissions",
-              onClick: () => handleOpenSettingsModal('account')
-            },
-            {
-              title: "Password & Security",
-              description: "Update your login credentials",
-              onClick: () => handleOpenSettingsModal('security')
-            }
-          ]}
+          items={accountItems}
         />
         
         <SettingsCard 
@@ -108,6 +129,24 @@ const Settings: React.FC = () => {
           ]}
         />
       </div>
+
+      {isAdmin && (
+        <SettingsCard
+          title="Tax & Discount"
+          icon={<Percent className="h-5 w-5 text-emerald-700" />}
+        >
+          <TaxDiscountSettingsPanel />
+        </SettingsCard>
+      )}
+
+      {isAdmin && (
+        <SettingsCard
+          title="Trading Day"
+          icon={<CalendarDays className="h-5 w-5 text-blue-600" />}
+        >
+          <BusinessDayPanel />
+        </SettingsCard>
+      )}
       
       <SettingsCard 
         title="Notifications"
@@ -126,7 +165,6 @@ const Settings: React.FC = () => {
         />
       </SettingsCard>
 
-      {/* Settings Modal */}
       <SettingsModal
         isOpen={showSettingsModal}
         onClose={handleCloseSettingsModal}

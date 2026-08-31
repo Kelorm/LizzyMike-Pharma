@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import apiClient from '../utils/axios';
+import apiClient, { ensureCsrfCookie } from '../utils/axios';
 
 interface User {
-  id: string; // Changed to string to handle UUID
+  id: string;
   username: string;
   email: string;
   role: 'admin' | 'pharmacist' | 'staff';
@@ -13,116 +13,94 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (access: string, refresh: string) => Promise<void>;
-  logout: () => void;
+  login: () => Promise<User>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+const mapUser = (data: {
+  id: string;
+  username: string;
+  email: string;
+  role: User['role'];
+  full_name?: string;
+}): User => ({
+  id: data.id,
+  username: data.username,
+  email: data.email,
+  role: data.role,
+  full_name: data.full_name || '',
+});
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isFetchingProfile, setIsFetchingProfile] = useState(false);
 
-  // Move clearAuthState outside of useCallback to prevent dependency issues
   const clearAuthState = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
-    setUser(null);
     delete apiClient.defaults.headers.common['Authorization'];
-    console.log('[AuthContext] Auth state cleared');
+    setUser(null);
   };
 
-  // Remove fetchProfile from useCallback dependencies to prevent infinite loop
-  const fetchProfile = useCallback(async (): Promise<void> => {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
-    
-    // Prevent multiple simultaneous calls
-    if (isFetchingProfile) {
-      return;
-    }
-    
-    setIsFetchingProfile(true);
-    console.log('[AuthContext] fetchProfile called');
+  const fetchProfile = useCallback(async (): Promise<User | null> => {
     try {
       const response = await apiClient.get('/profile/');
-      const userData = {
-        id: response.data.id,
-        username: response.data.username,
-        email: response.data.email,
-        role: response.data.role,
-        full_name: response.data.full_name || ''
-      };
-      setUser(userData);
-      console.log('[AuthContext] Profile fetched:', userData);
-    } catch (error) {
-      console.log('[AuthContext] fetchProfile error:', error);
+      const mapped = mapUser(response.data);
+      setUser(mapped);
+      return mapped;
+    } catch {
       clearAuthState();
-    } finally {
-      setIsLoading(false);
-      setIsFetchingProfile(false);
-    }
-  }, [isFetchingProfile]); // Add isFetchingProfile to dependencies
-
-  // Initial auth check - remove fetchProfile from dependency array
-  useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    console.log('[AuthContext] Initial auth check, token exists:', !!token);
-    if (token) {
-      fetchProfile();
-    } else {
-      setIsLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount
-
-  // Debug effect to track user state changes
-  useEffect(() => {
-    console.log('[AuthContext] User state changed:', user ? `User: ${user.username}` : 'No user');
-  }, [user]);
-
-  // Debug effect to track loading state changes
-  useEffect(() => {
-    console.log('[AuthContext] Loading state changed:', isLoading);
-  }, [isLoading]);
-
-  const login = useCallback(async (access: string, refresh: string): Promise<void> => {
-    console.log('[AuthContext] Login function called');
-    localStorage.setItem('access_token', access);
-    localStorage.setItem('refresh_token', refresh);
-    console.log('[AuthContext] login: tokens set');
-    // Set the token in axios defaults immediately
-    apiClient.defaults.headers.common['Authorization'] = `Bearer ${access}`;
-    
-    // Immediately fetch the user profile after setting tokens
-    try {
-      setIsLoading(true);
-      console.log('[AuthContext] Fetching profile during login...');
-      const response = await apiClient.get('/profile/');
-      const userData = {
-        id: response.data.id,
-        username: response.data.username,
-        email: response.data.email,
-        role: response.data.role,
-        full_name: response.data.full_name || ''
-      };
-      setUser(userData);
-      console.log('[AuthContext] Profile fetched during login:', userData);
-    } catch (error) {
-      console.log('[AuthContext] Login profile fetch error:', error);
-      clearAuthState();
-      throw error; // Re-throw to let the login component handle the error
-    } finally {
-      setIsLoading(false);
+      return null;
     }
   }, []);
 
-  const logout = useCallback(() => {
-    console.log('[AuthContext] Logout called');
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await ensureCsrfCookie();
+      try {
+        const response = await apiClient.get('/profile/');
+        if (!cancelled) {
+          setUser(mapUser(response.data));
+        }
+      } catch {
+        if (!cancelled) {
+          clearAuthState();
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const login = useCallback(async (): Promise<User> => {
+    setIsLoading(true);
+    try {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      const profile = await fetchProfile();
+      if (!profile) {
+        throw new Error('Could not load profile after login');
+      }
+      return profile;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [fetchProfile]);
+
+  const logout = useCallback(async () => {
+    try {
+      await apiClient.post('/auth/logout/', {});
+    } catch {
+      // ignore
+    }
     clearAuthState();
     window.location.href = '/login';
   }, []);
@@ -152,12 +130,5 @@ export const useAuth = (): AuthContextType => {
 
 export const useRequireAuth = () => {
   const { isAuthenticated, isLoading } = useAuth();
-  
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      console.log('User not authenticated');
-    }
-  }, [isAuthenticated, isLoading]);
-
   return { isAuthenticated, isLoading };
 };

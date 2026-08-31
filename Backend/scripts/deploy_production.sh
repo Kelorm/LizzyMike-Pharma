@@ -27,18 +27,18 @@ print_error() {
 # Check if .env file exists
 if [ ! -f ".env" ]; then
     print_warning ".env file not found. Creating from template..."
-    if [ -f "env.production.template" ]; then
-        cp env.production.template .env
+    if [ -f ".env.example" ]; then
+        cp .env.example .env
         print_warning "Please edit .env file with your production values before continuing."
         exit 1
     else
-        print_error "env.production.template not found. Cannot create .env file."
+        print_error ".env.example not found. Cannot create .env file."
         exit 1
     fi
 fi
 
 # Set environment
-export DJANGO_SETTINGS_MODULE=pharmasys.settings_production
+export DJANGO_SETTINGS_MODULE=pharmasys.settings_consolidated
 
 # Create necessary directories
 print_status "Creating necessary directories..."

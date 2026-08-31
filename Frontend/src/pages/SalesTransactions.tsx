@@ -69,7 +69,9 @@ const SalesTransactions: React.FC<SalesTransactionsProps> = ({
     return sales.filter(sale => {
       // Search filter
       const searchMatch = searchTerm === '' || 
-        customerMap[sale.customer]?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        customerMap[sale.customer || '']?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (sale.customer_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (sale.created_by_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         getTransactionSearchableText(sale).toLowerCase().includes(searchTerm.toLowerCase()) ||
         sale.items.some(item => 
           (item.medication_name as string)?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -138,13 +140,14 @@ const SalesTransactions: React.FC<SalesTransactionsProps> = ({
   };
 
   const handleExportCSV = () => {
-    const headers = ['Date', 'Transaction ID', 'Customer', 'Items', 'Total', 'Cost', 'Profit', 'Payment Method'];
+    const headers = ['Date', 'Transaction ID', 'Customer', 'Sold By', 'Items', 'Total', 'Cost', 'Profit', 'Payment Method'];
     const csvContent = [
       headers.join(','),
       ...filteredSales.map(sale => [
         format(parseISO(sale.date), 'yyyy-MM-dd'),
         sale.id,
-        customerMap[sale.customer] || `Customer ${sale.customer}`,
+        sale.customer_name || customerMap[sale.customer || ''] || 'Walk-in Customer',
+        sale.created_by_name || '—',
         sale.items.map(item => `${item.medication_name} (${item.qty})`).join('; '),
         (Number(sale.total) || 0).toFixed(2),
         (Number(sale.total_cost) || 0).toFixed(2),
@@ -261,7 +264,7 @@ const SalesTransactions: React.FC<SalesTransactionsProps> = ({
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search by customer, transaction ID, or items..."
+                placeholder="Search by customer, sold by, transaction ID, or items..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -318,6 +321,9 @@ const SalesTransactions: React.FC<SalesTransactionsProps> = ({
                   Customer
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Sold By
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Items
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -334,7 +340,7 @@ const SalesTransactions: React.FC<SalesTransactionsProps> = ({
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredSales.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
                     No transactions found matching your criteria.
                   </td>
                 </tr>
@@ -358,9 +364,14 @@ const SalesTransactions: React.FC<SalesTransactionsProps> = ({
                       <div className="flex items-center">
                         <User className="h-4 w-4 text-gray-400 mr-2" />
                         <span className="text-sm text-gray-900">
-                          {customerMap[sale.customer] || `Customer ${sale.customer}`}
+                          {sale.customer_name || customerMap[sale.customer || ''] || 'Walk-in Customer'}
                         </span>
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-900">
+                        {sale.created_by_name || '—'}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <div className="max-w-xs">
@@ -461,9 +472,20 @@ const SalesTransactions: React.FC<SalesTransactionsProps> = ({
               {/* Customer Information */}
               <div className="mb-6">
                 <h3 className="text-lg font-semibold mb-2">Customer Information</h3>
-                <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="bg-gray-50 p-4 rounded-lg space-y-2">
                   <p className="text-gray-900">
-                    <span className="font-medium">Name:</span> {customerMap[selectedSale.customer] || `Customer ${selectedSale.customer}`}
+                    <span className="font-medium">Name:</span> {selectedSale.customer_name || customerMap[selectedSale.customer || ''] || 'Walk-in Customer'}
+                  </p>
+                  <p className="text-gray-900">
+                    <span className="font-medium">Sold by:</span> {selectedSale.created_by_name || '—'}
+                  </p>
+                  <p className="text-gray-900">
+                    <span className="font-medium">Date &amp; time:</span>{' '}
+                    {format(parseISO(selectedSale.date), 'MMMM dd, yyyy HH:mm')}
+                  </p>
+                  <p className="text-gray-900">
+                    <span className="font-medium">Transaction ID:</span>{' '}
+                    {formatTransactionId(selectedSale)}
                   </p>
                 </div>
               </div>

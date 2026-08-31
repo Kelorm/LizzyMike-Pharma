@@ -24,7 +24,7 @@ You need to configure environment variables in two places:
 
 #### Core Django Settings:
 ```
-DJANGO_SETTINGS_MODULE=pharmasys.settings_free
+DJANGO_SETTINGS_MODULE=pharmasys.settings_consolidated
 SECRET_KEY=your-super-long-secret-key-make-it-very-random-123456789
 DEBUG=False
 ALLOWED_HOSTS=your-app.railway.app
@@ -139,7 +139,7 @@ CSRF_TRUSTED_ORIGINS=https://your-actual-vercel-url.vercel.app
 
 ### Railway Backend Variables (All Required):
 ```
-DJANGO_SETTINGS_MODULE=pharmasys.settings_free
+DJANGO_SETTINGS_MODULE=pharmasys.settings_consolidated
 SECRET_KEY=django-insecure-pharmasys-production-key-2024-very-secure-random-string-12345
 DEBUG=False
 ALLOWED_HOSTS=your-app.railway.app
@@ -230,7 +230,7 @@ Visit: `https://your-app.railway.app/api/health/`
 ## 📱 Quick Reference
 
 ### Railway Variables Checklist:
-- [ ] `DJANGO_SETTINGS_MODULE=pharmasys.settings_free`
+- [ ] `DJANGO_SETTINGS_MODULE=pharmasys.settings_consolidated`
 - [ ] `SECRET_KEY` (long random string)
 - [ ] `DEBUG=False`
 - [ ] `ALLOWED_HOSTS` (your Railway domain)

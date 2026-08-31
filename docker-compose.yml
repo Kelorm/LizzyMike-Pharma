@@ -1,0 +1,234 @@
+# LizzyMike Pharmacy System - Docker Compose Configuration
+# 
+# This file defines the complete stack including:
+# - PostgreSQL database
+# - Redis message broker
+# - Django application
+# - Celery worker for background tasks
+# - Celery Beat scheduler for periodic tasks
+# - Nginx for static file serving
+#
+# Usage:
+#   docker-compose up -d          # Start all services
+#   docker-compose up -d redis   # Start only Redis
+#   docker-compose logs -f celery # View Celery logs
+
+services:
+  # =============================================================================
+  # REDIS - Message Broker & Result Backend
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: lizzymike-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pharmacy-network
+
+  # =============================================================================
+  # POSTGRESQL - Database
+  # =============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: lizzymike-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pharmacy}
+      POSTGRES_USER: ${POSTGRES_USER:-pharmacy}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your environment}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pharmacy}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pharmacy-network
+
+  # =============================================================================
+  # DJANGO APPLICATION
+  # =============================================================================
+  web:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    container_name: lizzymike-web
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/live/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    environment:
+      - DJANGO_ENV=${DJANGO_ENV:-development}
+      - POSTGRES_DB=${POSTGRES_DB:-pharmacy}
+      - POSTGRES_USER=${POSTGRES_USER:-pharmacy}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your environment}
+      - POSTGRES_HOST=postgres
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./Backend:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    networks:
+      - pharmacy-network
+    command: >
+      sh -c "
+        python manage.py migrate --noinput &&
+        python manage.py collectstatic --noinput &&
+        gunicorn pharmasys.wsgi:application --bind 0.0.0.0:8000 --workers 2
+      "
+
+  # =============================================================================
+  # CELERY WORKER - Background Task Processor
+  # =============================================================================
+  celery-worker:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    container_name: lizzymike-celery-worker
+    restart: unless-stopped
+    environment:
+      - DJANGO_ENV=${DJANGO_ENV:-development}
+      - POSTGRES_DB=${POSTGRES_DB:-pharmacy}
+      - POSTGRES_USER=${POSTGRES_USER:-pharmacy}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your environment}
+      - POSTGRES_HOST=postgres
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
+    volumes:
+      - ./Backend:/app
+    networks:
+      - pharmacy-network
+    command: >
+      sh -c "
+        celery -A pharmasys worker --loglevel=info --concurrency=2
+      "
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # =============================================================================
+  # CELERY BEAT - Periodic Task Scheduler
+  # =============================================================================
+  celery-beat:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    container_name: lizzymike-celery-beat
+    restart: unless-stopped
+    environment:
+      - DJANGO_ENV=${DJANGO_ENV:-development}
+      - POSTGRES_DB=${POSTGRES_DB:-pharmacy}
+      - POSTGRES_USER=${POSTGRES_USER:-pharmacy}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your environment}
+      - POSTGRES_HOST=postgres
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
+    volumes:
+      - ./Backend:/app
+    networks:
+      - pharmacy-network
+    command: >
+      sh -c "
+        celery -A pharmasys beat --loglevel=info
+      "
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # =============================================================================
+  # NGINX - Frontend & API Proxy (LAN Deployment)
+  # =============================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: lizzymike-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/lan.conf:/etc/nginx/conf.d/default.conf:ro
+      - static_volume:/app/staticfiles:ro
+      - media_volume:/app/media:ro
+    depends_on:
+      web:
+        condition: service_healthy
+    networks:
+      - pharmacy-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  static_volume:
+    driver: local
+  media_volume:
+    driver: local
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  pharmacy-network:
+    driver: bridge

@@ -1,60 +1,46 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useGlobalSearch } from '../contexts/GlobalSearchContext';
+import { useBranch } from '../contexts/BranchContext';
+import { useLayoutMetrics } from '../contexts/LayoutMetricsContext';
 import { usePermissions } from '../hooks/usePermissions';
 import GlobalSearchModal from './GlobalSearchModal';
 import LizzyMikeLogo from '../assets/LizzyMikeLogo.png';
-
-interface Notification {
-  id: number;
-  message: string;
-  type: 'info' | 'warning' | 'critical';
-  date: string;
-  read: boolean;
-}
-
-interface User {
-  id: number;
-  username: string;
-  email: string;
-  role: 'admin' | 'pharmacist' | 'staff';
-  full_name: string;
-}
+import { Notification } from '../types';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
   activeTab: string;
-  setActiveTab: (tab: string) => void;
   lowStockCount: number;
   pendingPrescriptions: number;
   notifications: Notification[];
   totalStockValue: number;
-  sales: any[]; // Add sales prop
+  sales: Array<{ date: string; total: number | string }>;
   notificationCount: number;
-  onSearch: (query: string) => void;
 }
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   children,
-  activeTab,
-  setActiveTab,
+  activeTab: _activeTab,
   lowStockCount,
   pendingPrescriptions,
   notifications,
   totalStockValue,
   sales,
   notificationCount,
-  onSearch
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const { user, logout } = useAuth();
-  const { performGlobalSearch } = useGlobalSearch();
+  const { branches, activeBranch, setActiveBranchId } = useBranch();
+  const { markNotificationRead, markAllNotificationsRead } = useLayoutMetrics();
   const { navPermissions } = usePermissions();
   const location = useLocation();
+  const navigate = useNavigate();
+  const notificationsRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
 
   // Calculate Today's Revenue using the same logic as Dashboard
   const todaysRevenue = useMemo(() => {
@@ -86,6 +72,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         event.preventDefault();
         setShowGlobalSearch(true);
       }
+      if (event.key === 'Escape') {
+        setShowNotifications(false);
+        setShowProfileMenu(false);
+      }
     };
 
     document.addEventListener('keydown', handleKeyDown);
@@ -94,13 +84,45 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     };
   }, []);
 
+  useEffect(() => {
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (notificationsRef.current && !notificationsRef.current.contains(target)) {
+        setShowNotifications(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(target)) {
+        setShowProfileMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, []);
+
+  const notificationTone = (type: Notification['type']) => {
+    if (type === 'low_stock' || type === 'expiry') return 'text-amber-700 bg-amber-50';
+    if (type === 'prescription') return 'text-blue-700 bg-blue-50';
+    return 'text-gray-700 bg-gray-50';
+  };
+
+  const notificationLabel = (type: Notification['type']) => {
+    if (type === 'low_stock') return 'Low stock';
+    if (type === 'expiry') return 'Expiry';
+    if (type === 'prescription') return 'Prescription';
+    return 'System';
+  };
+
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', path: '/', icon: 'dashboard', permission: 'dashboard' },
     { id: 'inventory', label: 'Inventory', path: '/inventory', icon: 'inventory', permission: 'inventory' },
     { id: 'prescription', label: 'Prescriptions', path: '/prescription', icon: 'prescription', permission: 'prescriptions' },
     { id: 'customers', label: 'Customers', path: '/customers', icon: 'customers', permission: 'customers' },
-    { id: 'sales', label: 'Sales', path: '/sales', icon: 'sales', permission: 'sales' },
+    { id: 'pos', label: 'POS', path: '/pos', icon: 'sales', permission: 'sales' },
+    { id: 'sales', label: 'Sales', path: '/sales', icon: 'sales', permission: 'analytics' },
     { id: 'sales-transactions', label: 'Transactions', path: '/sales-transactions', icon: 'transactions', permission: 'sales' },
+    { id: 'restock', label: 'Restock', path: '/restock', icon: 'inventory', permission: 'restock' },
+    { id: 'stock-movements', label: 'Stock Ledger', path: '/stock-movements', icon: 'inventory', permission: 'stockMovements' },
+    { id: 'branches', label: 'Branches', path: '/branches', icon: 'branches', permission: 'branches' },
+    { id: 'audit', label: 'Audit', path: '/audit', icon: 'settings', permission: 'audit' },
     { id: 'settings', label: 'Settings', path: '/settings', icon: 'settings', permission: 'settings' },
   ].filter(item => navPermissions[item.permission as keyof typeof navPermissions]);
 
@@ -140,6 +162,12 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         return (
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+          </svg>
+        );
+      case 'branches':
+        return (
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
           </svg>
         );
       case 'settings':
@@ -195,21 +223,50 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 </div>
                 <span className="text-gray-500">Search across system...</span>
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                  <kbd className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-100 border border-gray-300 rounded">
-                    {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}K
-                  </kbd>
+                  <span className="px-2.5 py-1 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded">
+                    Search
+                  </span>
                 </div>
               </button>
             </div>
             
             {/* Right Section */}
             <div className="flex items-center space-x-2 sm:space-x-4">
+              {/* Branch switcher */}
+              {activeBranch && (
+                <div className="hidden sm:flex items-center gap-2">
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">Branch</label>
+                  {branches.length > 1 ? (
+                    <select
+                      value={activeBranch.id}
+                      onChange={(e) => setActiveBranchId(e.target.value)}
+                      className="text-sm border border-gray-300 rounded-md px-2 py-1.5 bg-white max-w-[10rem]"
+                      title="Active pharmacy branch"
+                    >
+                      {branches.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.code} — {b.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="text-sm font-medium text-gray-800 truncate max-w-[10rem]">
+                      {activeBranch.code}
+                    </span>
+                  )}
+                </div>
+              )}
               {/* Notifications */}
-              <div className="relative">
+              <div className="relative" ref={notificationsRef}>
                 <button
                   type="button"
                   className="bg-white rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 relative p-2"
-                  onClick={() => setShowNotifications(!showNotifications)}
+                  onClick={() => {
+                    setShowProfileMenu(false);
+                    setShowNotifications((open) => !open);
+                  }}
+                  aria-expanded={showNotifications}
+                  aria-haspopup="true"
                 >
                   <span className="sr-only">View notifications</span>
                   <svg className="h-5 w-5 sm:h-6 sm:w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -217,19 +274,99 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   </svg>
                   {notificationCount > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                      {notificationCount}
+                      {notificationCount > 99 ? '99+' : notificationCount}
                     </span>
                   )}
                 </button>
+
+                {showNotifications && (
+                  <div className="origin-top-right absolute right-0 mt-2 w-80 sm:w-96 rounded-lg shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                      <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+                      {notifications.some((n) => !n.read) && (
+                        <button
+                          type="button"
+                          className="text-xs text-blue-600 hover:text-blue-800"
+                          onClick={() => markAllNotificationsRead()}
+                        >
+                          Mark all read
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-80 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="px-4 py-8 text-center text-sm text-gray-500">
+                          No notifications right now
+                        </div>
+                      ) : (
+                        notifications.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            className={`w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${
+                              item.read ? 'opacity-70' : ''
+                            }`}
+                            onClick={() => {
+                              markNotificationRead(item.id);
+                              setShowNotifications(false);
+                              if (item.href) {
+                                navigate(item.href);
+                              }
+                            }}
+                          >
+                            <div className="flex items-start gap-3">
+                              <span
+                                className={`mt-0.5 inline-flex px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${notificationTone(
+                                  item.type
+                                )}`}
+                              >
+                                {notificationLabel(item.type)}
+                              </span>
+                              {!item.read && (
+                                <span className="mt-1 h-2 w-2 rounded-full bg-blue-500 shrink-0" />
+                              )}
+                            </div>
+                            <p className="mt-1 text-sm text-gray-800">{item.message}</p>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                    {(lowStockCount > 0 || pendingPrescriptions > 0) && (
+                      <div className="px-4 py-2 bg-gray-50 border-t border-gray-100 flex gap-3 text-xs">
+                        {lowStockCount > 0 && (
+                          <Link
+                            to="/inventory"
+                            className="text-red-600 hover:underline"
+                            onClick={() => setShowNotifications(false)}
+                          >
+                            {lowStockCount} low stock
+                          </Link>
+                        )}
+                        {pendingPrescriptions > 0 && (
+                          <Link
+                            to="/prescription"
+                            className="text-orange-600 hover:underline"
+                            onClick={() => setShowNotifications(false)}
+                          >
+                            {pendingPrescriptions} pending Rx
+                          </Link>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               
               {/* Profile Dropdown */}
-              <div className="relative">
+              <div className="relative" ref={profileRef}>
                 <div>
                   <button
                     type="button"
                     className="flex items-center max-w-xs text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    onClick={() => setShowProfileMenu(!showProfileMenu)}
+                    onClick={() => {
+                      setShowNotifications(false);
+                      setShowProfileMenu((open) => !open);
+                    }}
                   >
                     <div className="bg-blue-500 text-white rounded-full h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center text-sm sm:text-base">
                       {user?.full_name?.[0] || 'U'}
@@ -264,9 +401,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
       {/* Main Content Area */}
       <div className="flex flex-1">
-        {/* Vertical Sidebar */}
-        <div className="hidden lg:block bg-white w-64 min-h-screen border-r border-gray-200 flex-col fixed top-16 left-0 z-20">
-          <div className="p-4 flex-grow">
+        {/* Vertical Sidebar — nav scrolls; quick stats pinned at bottom */}
+        <aside className="hidden lg:flex lg:flex-col bg-white w-64 border-r border-gray-200 fixed top-16 left-0 z-20 h-[calc(100vh-4rem)]">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4">
             <nav className="space-y-1">
               {navItems.map((item) => (
                 <Link
@@ -277,7 +414,6 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                       ? 'bg-blue-50 text-blue-700 border-blue-500'
                       : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   } group flex items-center px-3 py-2 text-sm font-medium rounded-md border-l-4 transition-colors`}
-                  onClick={() => setActiveTab(item.id)}
                 >
                   <span className="text-blue-500 mr-3">
                     {getIcon(item.icon)}
@@ -287,49 +423,45 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               ))}
             </nav>
           </div>
-          
-          {/* QUICK STATS SECTION IN SIDEBAR */}
-          <div className="p-4 bg-blue-50 border-t border-gray-200">
+
+          {/* Quick Stats — always visible at bottom of sidebar */}
+          <div className="flex-shrink-0 p-4 bg-blue-50 border-t border-gray-200">
             <h2 className="text-lg font-semibold text-gray-700 mb-4">Quick Stats</h2>
             <div className="space-y-2">
-              {/* Total Stock Value */}
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-gray-500">Total Stock Value</span>
                 <span className="text-sm font-semibold text-gray-800">
                   GHS {totalStockValue.toFixed(2)}
                 </span>
               </div>
-              {/* Pending Orders */}
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-gray-500">Pending Orders</span>
                 <span className="text-sm font-semibold text-orange-600">
                   {pendingPrescriptions}
                 </span>
               </div>
-              {/* Low Stock Items */}
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-gray-500">Low Stock Items</span>
                 <span className="text-sm font-semibold text-red-600">
                   {lowStockCount}
                 </span>
               </div>
-              {/* Today's Revenue */}
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-500">Today's Revenue</span>
+                <span className="text-sm font-medium text-gray-500">Today&apos;s Revenue</span>
                 <span className="text-sm font-semibold text-green-600">
                   GHS {todaysRevenue.toFixed(2)}
                 </span>
               </div>
             </div>
           </div>
-        </div>
+        </aside>
 
         {/* Mobile Menu */}
         {showMobileMenu && (
           <div className="md:hidden fixed inset-0 z-50">
             <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setShowMobileMenu(false)}></div>
-            <div className="fixed left-0 top-0 h-full w-80 max-w-[85vw] bg-white shadow-xl transform transition-transform duration-300 ease-in-out">
-              <div className="flex items-center justify-between p-4 border-b border-gray-200">
+            <div className="fixed left-0 top-0 flex h-full w-80 max-w-[85vw] flex-col bg-white shadow-xl transform transition-transform duration-300 ease-in-out">
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
                 <div className="flex items-center">
                   <img src={LizzyMikeLogo} alt="Logo" className="h-8 w-8 object-contain mr-3" />
                   <span className="text-lg font-bold text-blue-600">Menu</span>
@@ -343,8 +475,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   </svg>
                 </button>
               </div>
-              
-              <div className="p-4">
+
+              <div className="flex-1 min-h-0 overflow-y-auto p-4">
                 <nav className="space-y-2">
                   {navItems.map((item) => (
                     <Link
@@ -356,7 +488,6 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                           : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                       } group flex items-center px-3 py-3 text-sm font-medium rounded-md border-l-4 transition-colors`}
                       onClick={() => {
-                        setActiveTab(item.id);
                         setShowMobileMenu(false);
                       }}
                     >
@@ -367,27 +498,27 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     </Link>
                   ))}
                 </nav>
-                
-                {/* Mobile Quick Stats */}
-                <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Quick Stats</h3>
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="bg-white p-2 rounded">
-                      <div className="text-gray-500">Stock Value</div>
-                      <div className="font-semibold text-gray-800">GHS {totalStockValue.toFixed(2)}</div>
-                    </div>
-                    <div className="bg-white p-2 rounded">
-                      <div className="text-gray-500">Pending</div>
-                      <div className="font-semibold text-orange-600">{pendingPrescriptions}</div>
-                    </div>
-                    <div className="bg-white p-2 rounded">
-                      <div className="text-gray-500">Low Stock</div>
-                      <div className="font-semibold text-red-600">{lowStockCount}</div>
-                    </div>
-                    <div className="bg-white p-2 rounded">
-                      <div className="text-gray-500">Today's Revenue</div>
-                      <div className="font-semibold text-green-600">GHS {todaysRevenue.toFixed(2)}</div>
-                    </div>
+              </div>
+
+              {/* Mobile Quick Stats — pinned at bottom */}
+              <div className="flex-shrink-0 p-4 bg-blue-50 border-t border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Quick Stats</h3>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="bg-white p-2 rounded">
+                    <div className="text-gray-500">Stock Value</div>
+                    <div className="font-semibold text-gray-800">GHS {totalStockValue.toFixed(2)}</div>
+                  </div>
+                  <div className="bg-white p-2 rounded">
+                    <div className="text-gray-500">Pending</div>
+                    <div className="font-semibold text-orange-600">{pendingPrescriptions}</div>
+                  </div>
+                  <div className="bg-white p-2 rounded">
+                    <div className="text-gray-500">Low Stock</div>
+                    <div className="font-semibold text-red-600">{lowStockCount}</div>
+                  </div>
+                  <div className="bg-white p-2 rounded">
+                    <div className="text-gray-500">Today&apos;s Revenue</div>
+                    <div className="font-semibold text-green-600">GHS {todaysRevenue.toFixed(2)}</div>
                   </div>
                 </div>
               </div>
@@ -411,9 +542,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 </div>
                 <span className="text-gray-500">Search across system...</span>
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                  <kbd className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-100 border border-gray-300 rounded">
-                    {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}K
-                  </kbd>
+                  <span className="px-2.5 py-1 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded">
+                    Search
+                  </span>
                 </div>
               </button>
             </div>

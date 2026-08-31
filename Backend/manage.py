@@ -3,10 +3,16 @@
 import os
 import sys
 
+from pharmasys.env_loader import load_backend_env_files
+
+load_backend_env_files()
+
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pharmasys.settings_production')
+    if 'DJANGO_SETTINGS_MODULE' in os.environ:
+        os.environ['DJANGO_SETTINGS_MODULE'] = os.environ['DJANGO_SETTINGS_MODULE'].strip()
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pharmasys.settings_consolidated')
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:

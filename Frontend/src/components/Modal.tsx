@@ -1,9 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Medication } from '../types';
 import { Plus, Trash2 } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { toast } from 'react-hot-toast';
 import MedicationComboBox from './MedicationComboBox';
 import getMedicationsForSale from '../services/api';
+import {
+  buildCategoryOptions,
+  buildClassificationOptions,
+  rememberCustomCategory,
+  rememberCustomClassification,
+} from '../constants/medicationOptions';
+
+const CUSTOM_OPTION = '__custom__';
 
 interface ModalProps {
   type: string;
@@ -12,7 +20,6 @@ interface ModalProps {
   onSaveMedication?: (medication: any, isEdit: boolean) => void;
   onDeleteMedication?: (id: number) => void;
   onSaveSale?: (saleData: any) => Promise<void>;
-  onSaveRestock?: (restockData: any) => Promise<void>;
   medications?: Medication[];
   customers?: any[];
 }
@@ -24,7 +31,6 @@ const Modal: React.FC<ModalProps> = ({
   onSaveMedication, 
   onDeleteMedication,
   onSaveSale,
-  onSaveRestock,
   medications = [],
   customers = []
 }) => {
@@ -42,6 +48,20 @@ const Modal: React.FC<ModalProps> = ({
   
   const [availableMeds, setAvailableMeds] = useState<Medication[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [customCategoryMode, setCustomCategoryMode] = useState(false);
+  const [customClassificationMode, setCustomClassificationMode] = useState(false);
+  const [optionTick, setOptionTick] = useState(0);
+
+  const categoryOptions = useMemo(
+    () => buildCategoryOptions(medications.map((m) => m.category || '')),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [medications, optionTick]
+  );
+  const classificationOptions = useMemo(
+    () => buildClassificationOptions(medications.map((m) => m.classification || '')),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [medications, optionTick]
+  );
 
   // FAST FIX: Always filter locally for newSale
   useEffect(() => {
@@ -53,18 +73,14 @@ const Modal: React.FC<ModalProps> = ({
     };
 
     if (type === 'newSale') {
-      // Always filter locally for newSale
       const inStock = medications.filter(m => m.stock > 0);
       setAvailableMeds(convertMedications(inStock));
-    } else if (type === 'restock') {
-      // For restock, use all medications
-      setAvailableMeds(convertMedications(medications));
     } else {
       setAvailableMeds(convertMedications(medications));
     }
   }, [type, medications]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
     // Clear error when field changes
@@ -139,17 +155,23 @@ const Modal: React.FC<ModalProps> = ({
       });
     }
     
-    if (type === 'restock') {
-      if (!formData.medication) newErrors.medication = 'Medication is required';
-      if (!formData.supplier) newErrors.supplier = 'Supplier is required';
-      if (!formData.quantity || formData.quantity <= 0) newErrors.quantity = 'Quantity must be greater than 0';
-      if (!formData.unit_cost || formData.unit_cost <= 0) newErrors.unit_cost = 'Unit cost must be greater than 0';
-      if (!formData.expiry) newErrors.expiry = 'Expiry date is required';
-    }
-    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+
+  useEffect(() => {
+    if (type !== 'addMedication' && type !== 'editMedication') return;
+    const cat = (formData.category || '').trim();
+    const cls = (formData.classification || '').trim();
+    if (cat && !categoryOptions.includes(cat)) {
+      setCustomCategoryMode(true);
+    }
+    if (cls && !classificationOptions.includes(cls)) {
+      setCustomClassificationMode(true);
+    }
+    // only on open / item change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, item]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,8 +183,17 @@ const Modal: React.FC<ModalProps> = ({
     
     try {
       if (type.includes('Medication')) {
+        const category = String(formData.category || '').trim();
+        const classification = String(formData.classification || '').trim();
+        if (!category || !classification) {
+          toast.error('Category and classification are required');
+          return;
+        }
+        rememberCustomCategory(category);
+        rememberCustomClassification(classification);
+        setOptionTick((n) => n + 1);
         const isEdit = type.startsWith('edit');
-        onSaveMedication?.(formData, isEdit);
+        onSaveMedication?.({ ...formData, category, classification }, isEdit);
       } 
       else if (type === 'newSale') {
         const total = saleItems.reduce((sum, item) => {
@@ -181,17 +212,6 @@ const Modal: React.FC<ModalProps> = ({
           }))
         };
         await onSaveSale?.(saleData);
-      }
-      else if (type === 'restock') {
-        const restockData = {
-          medication: formData.medication,
-          supplier: formData.supplier,
-          quantity: parseInt(formData.quantity),
-          batch_number: formData.batch_number,
-          expiry: formData.expiry,
-          unit_cost: parseFloat(formData.unit_cost),
-        };
-        await onSaveRestock?.(restockData);
       }
       onClose();
     } catch (err) {
@@ -252,27 +272,143 @@ const Modal: React.FC<ModalProps> = ({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Category *</label>
-                <input
-                  type="text"
-                  name="category"
-                  value={formData.category || ''}
+                {!customCategoryMode ? (
+                  <select
+                    name="category"
+                    value={formData.category || ''}
+                    onChange={(e) => {
+                      if (e.target.value === CUSTOM_OPTION) {
+                        setCustomCategoryMode(true);
+                        setFormData({ ...formData, category: '' });
+                        return;
+                      }
+                      handleInputChange(e);
+                    }}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                    required
+                  >
+                    <option value="">Select category</option>
+                    {categoryOptions.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                    <option value={CUSTOM_OPTION}>+ Add new category…</option>
+                  </select>
+                ) : (
+                  <div className="mt-1 space-y-2">
+                    <input
+                      type="text"
+                      name="category"
+                      value={formData.category || ''}
+                      onChange={handleInputChange}
+                      className="block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                      placeholder="Type new category"
+                      required
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      className="text-xs text-blue-600 hover:underline"
+                      onClick={() => {
+                        setCustomCategoryMode(false);
+                        setFormData({ ...formData, category: '' });
+                      }}
+                    >
+                      Choose from list instead
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Classification *</label>
+                {!customClassificationMode ? (
+                  <select
+                    name="classification"
+                    value={formData.classification || ''}
+                    onChange={(e) => {
+                      if (e.target.value === CUSTOM_OPTION) {
+                        setCustomClassificationMode(true);
+                        setFormData({ ...formData, classification: '' });
+                        return;
+                      }
+                      handleInputChange(e);
+                    }}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                    required
+                  >
+                    <option value="">Select classification</option>
+                    {classificationOptions.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                    <option value={CUSTOM_OPTION}>+ Add new classification…</option>
+                  </select>
+                ) : (
+                  <div className="mt-1 space-y-2">
+                    <input
+                      type="text"
+                      name="classification"
+                      value={formData.classification || ''}
+                      onChange={handleInputChange}
+                      className="block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                      placeholder="Type new classification"
+                      required
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      className="text-xs text-blue-600 hover:underline"
+                      onClick={() => {
+                        setCustomClassificationMode(false);
+                        setFormData({ ...formData, classification: '' });
+                      }}
+                    >
+                      Choose from list instead
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Supplier *</label>
+              <input
+                type="text"
+                name="supplier"
+                value={formData.supplier || ''}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                required
+              />
+            </div>
+
+            <fieldset className="border border-gray-200 rounded-md p-3 space-y-3">
+              <legend className="text-sm font-medium text-gray-700 px-1">Description and dosage</legend>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Description</label>
+                <textarea
+                  name="description"
+                  value={formData.description || ''}
                   onChange={handleInputChange}
+                  rows={3}
                   className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                  required
+                  placeholder="Optional notes about the medication"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Supplier *</label>
+                <label className="block text-sm font-medium text-gray-700">Dosage</label>
                 <input
                   type="text"
-                  name="supplier"
-                  value={formData.supplier || ''}
+                  name="dosage"
+                  value={formData.dosage || ''}
                   onChange={handleInputChange}
                   className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                  required
+                  placeholder="e.g. 500mg, 5ml twice daily"
                 />
               </div>
-            </div>
+            </fieldset>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -576,145 +712,6 @@ const Modal: React.FC<ModalProps> = ({
           </form>
         );
 
-      case 'restock':
-        return (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Medication *</label>
-              <MedicationComboBox
-                medications={availableMeds}
-                value={formData.medication}
-                onChange={(value) => {
-                  setFormData({ ...formData, medication: value });
-                  if (errors.medication) {
-                    setErrors(prev => {
-                      const newErrors = { ...prev };
-                      delete newErrors.medication;
-                      return newErrors;
-                    });
-                  }
-                  
-                  const med = availableMeds.find(m => String(m.id) === String(value));
-                  if (med) {
-                    setFormData((prev: any) => ({
-                      ...prev,
-                      supplier: med.supplier || ''
-                    }));
-                  }
-                }}
-                className="mt-1"
-              />
-              {errors.medication && <p className="mt-1 text-xs text-red-600">{errors.medication}</p>}
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Supplier *</label>
-              <input
-                type="text"
-                name="supplier"
-                value={formData.supplier || ''}
-                onChange={handleInputChange}
-                className={`mt-1 block w-full border ${errors.supplier ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm p-2`}
-                required
-              />
-              {errors.supplier && <p className="mt-1 text-xs text-red-600">{errors.supplier}</p>}
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Quantity *</label>
-                <input
-                  type="number"
-                  name="quantity"
-                  value={formData.quantity || ''}
-                  onChange={handleInputChange}
-                  className={`mt-1 block w-full border ${errors.quantity ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm p-2`}
-                  required
-                  min="1"
-                />
-                {errors.quantity && <p className="mt-1 text-xs text-red-600">{errors.quantity}</p>}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Unit Cost (GHS) *</label>
-                <input
-                  type="number"
-                  name="unit_cost"
-                  value={formData.unit_cost || ''}
-                  onChange={(e) => {
-                    handleInputChange(e);
-                    // Recalculate total cost
-                    if (formData.quantity) {
-                      setFormData({
-                        ...formData,
-                        unit_cost: e.target.value,
-                        total_cost: parseFloat(e.target.value || '0') * parseFloat(formData.quantity || '0')
-                      });
-                    }
-                  }}
-                  className={`mt-1 block w-full border ${errors.unit_cost ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm p-2`}
-                  required
-                  min="0.01"
-                  step="0.01"
-                />
-                {errors.unit_cost && <p className="mt-1 text-xs text-red-600">{errors.unit_cost}</p>}
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Batch Number *</label>
-                <input
-                  type="text"
-                  name="batch_number"
-                  value={formData.batch_number || ''}
-                  onChange={handleInputChange}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Expiry Date *</label>
-                <input
-                  type="date"
-                  name="expiry"
-                  value={formData.expiry || ''}
-                  onChange={handleInputChange}
-                  className={`mt-1 block w-full border ${errors.expiry ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm p-2`}
-                  required
-                />
-                {errors.expiry && <p className="mt-1 text-xs text-red-600">{errors.expiry}</p>}
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Total Cost (GHS)</label>
-              <input
-                type="text"
-                name="total_cost"
-                value={(parseFloat(formData.quantity || '0') * parseFloat(formData.unit_cost || '0')).toFixed(2)}
-                disabled
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-gray-100"
-              />
-            </div>
-            
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                Record Restock
-              </button>
-            </div>
-          </form>
-        );
-
       default:
         return (
           <>
@@ -744,8 +741,6 @@ const Modal: React.FC<ModalProps> = ({
         return 'Delete Medication';
       case 'newSale':
         return 'New Sale';
-      case 'restock':
-        return 'Restock Medication';
       default:
         return '';
     }
@@ -758,7 +753,6 @@ const Modal: React.FC<ModalProps> = ({
       case 'deleteMedication':
         return renderForm();
       case 'newSale':
-      case 'restock':
         return (
           <>
             {renderForm()}

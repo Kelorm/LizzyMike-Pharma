@@ -1,89 +1,194 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Dashboard from '../pages/Dashboard';
 import Inventory from '../pages/Inventory';
 import Prescriptions from '../pages/Prescriptions';
 import Customers from '../pages/Customers';
 import Sales from '../pages/Sales';
+import POS from '../pages/POS';
 import SalesTransactions from '../pages/SalesTransactions';
 import Settings from '../pages/Settings';
+import Branches from '../pages/Branches';
+import RestockPage from '../pages/Restock';
 import Modal from './Modal';
-import { Medication, Customer, Prescription } from '../types';
+import { Medication, Customer, Prescription, Sale } from '../types';
 import api from '../services/api';
 import { toast } from 'react-hot-toast';
+import { useLayoutMetrics } from '../contexts/LayoutMetricsContext';
+import { useMedicationContext } from '../contexts/MedicationContext';
+import { useAuth } from '../contexts/AuthContext';
+import { hasPermission } from '../utils/permissions';
 
-// Helper function to get array from response
-const getArrayFromResponse = <T,>(data: any): T[] => {
-  if (Array.isArray(data)) return data;
-  if (data?.results && Array.isArray(data.results)) return data.results;
+const getArrayFromResponse = <T,>(data: unknown): T[] => {
+  if (Array.isArray(data)) return data as T[];
+  if (data && typeof data === 'object' && Array.isArray((data as { results?: unknown }).results)) {
+    return (data as { results: T[] }).results;
+  }
   return [];
 };
 
-interface PharmacySystemProps {
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
-  setLowStockCount: (count: number) => void;
-  setPendingPrescriptions: (count: number) => void;
-  setTotalStockValue: (value: number) => void;
-  setNotificationCount: (count: number) => void;
-  onSalesUpdate: (sales: any[]) => void;
-}
+const pathToTab = (pathname: string): string => {
+  if (pathname.startsWith('/inventory')) return 'inventory';
+  if (pathname.startsWith('/prescription')) return 'prescription';
+  if (pathname.startsWith('/customers')) return 'customers';
+  if (pathname.startsWith('/sales-transactions')) return 'sales-transactions';
+  if (pathname.startsWith('/pos')) return 'pos';
+  if (pathname.startsWith('/sales')) return 'sales';
+  if (pathname.startsWith('/restock')) return 'restock';
+  if (pathname.startsWith('/branches')) return 'branches';
+  if (pathname.startsWith('/settings')) return 'settings';
+  return 'dashboard';
+};
 
-const PharmacySystem: React.FC<PharmacySystemProps> = ({
-  activeTab,
-  setActiveTab,
-  setLowStockCount,
-  setPendingPrescriptions,
-  setTotalStockValue,
-  setNotificationCount,
-  onSalesUpdate,
-}) => {
+const PharmacySystem: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const canViewPrescriptions = hasPermission(user?.role, 'view_prescriptions');
+  const activeTab = pathToTab(location.pathname);
+  const {
+    setLowStockCount,
+    setPendingPrescriptions,
+    setTotalStockValue,
+    setSales: setLayoutSales,
+    setNotifications,
+  } = useLayoutMetrics();
+  const { fetchMedications } = useMedicationContext();
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [medications, setMedications] = useState<Medication[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
-  const [sales, setSales] = useState<any[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('');
-  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [selectedItem, setSelectedItem] = useState<unknown>(null);
+
+  const setActiveTab = (tab: string) => {
+    const map: Record<string, string> = {
+      dashboard: '/',
+      inventory: '/inventory',
+      prescription: '/prescription',
+      prescriptions: '/prescription',
+      customers: '/customers',
+      sales: '/sales',
+      pos: '/pos',
+      'sales-transactions': '/sales-transactions',
+      restock: '/restock',
+      branches: '/branches',
+      settings: '/settings',
+    };
+    navigate(map[tab] || '/');
+  };
 
   const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Fetch all data in parallel
-      const [medsResponse, custsResponse, prescResponse, salesResponse] = await Promise.all([
-        api.medication.list(),
-        api.customer.list(),
-        api.prescription.list(),
-        api.sale.list()
+      const [medsResult, custsResult, salesResult, prescResult] = await Promise.all([
+        api.medication.list().then(
+          (r) => ({ ok: true as const, data: r.data }),
+          () => ({ ok: false as const, data: null })
+        ),
+        api.customer.list().then(
+          (r) => ({ ok: true as const, data: r.data }),
+          () => ({ ok: false as const, data: null })
+        ),
+        api.sale.list().then(
+          (r) => ({ ok: true as const, data: r.data }),
+          () => ({ ok: false as const, data: null })
+        ),
+        canViewPrescriptions
+          ? api.prescription.list().then(
+              (r) => ({ ok: true as const, data: r.data }),
+              () => ({ ok: false as const, data: null })
+            )
+          : Promise.resolve({ ok: true as const, data: [] as Prescription[] }),
       ]);
 
-      const medicationsData = getArrayFromResponse<Medication>(medsResponse.data);
-      const customersData = getArrayFromResponse<Customer>(custsResponse.data);
-      const prescriptionsData = getArrayFromResponse<Prescription>(prescResponse.data);
-      const salesData = getArrayFromResponse<any>(salesResponse.data);
+      if (!medsResult.ok && !custsResult.ok && !salesResult.ok) {
+        throw new Error('core_fetch_failed');
+      }
+
+      const medicationsData = medsResult.ok
+        ? getArrayFromResponse<Medication>(medsResult.data)
+        : [];
+      const customersData = custsResult.ok
+        ? getArrayFromResponse<Customer>(custsResult.data)
+        : [];
+      const prescriptionsData =
+        canViewPrescriptions && prescResult.ok
+          ? getArrayFromResponse<Prescription>(prescResult.data)
+          : [];
+      const salesData = salesResult.ok
+        ? getArrayFromResponse<Sale>(salesResult.data)
+        : [];
 
       setMedications(medicationsData);
       setCustomers(customersData);
       setPrescriptions(prescriptionsData);
       setSales(salesData);
+      setLayoutSales(salesData);
 
-      // Update dashboard stats
-      const lowStockCount = medicationsData.filter(med => med.stock <= med.min_stock).length;
-      const pendingPrescriptions = prescriptionsData.filter(p => p.status === 'preparing').length;
-      const totalStockValue = medicationsData.reduce((sum, med) => sum + (med.stock * med.price), 0);
+      const lowStockMeds = medicationsData.filter((med) => med.stock <= med.min_stock);
+      const pendingRx = prescriptionsData.filter((p) => p.status === 'preparing');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const in30Days = new Date(today);
+      in30Days.setDate(in30Days.getDate() + 30);
+      const expiringMeds = medicationsData.filter((med) => {
+        if (!med.expiry) return false;
+        const expiry = new Date(med.expiry);
+        return expiry >= today && expiry <= in30Days;
+      });
+
+      const lowStockCount = lowStockMeds.length;
+      const pendingPrescriptions = pendingRx.length;
+      const totalStockValue = medicationsData.reduce((sum, med) => sum + med.stock * med.price, 0);
+      const nowIso = new Date().toISOString();
+
+      const nextNotifications = [
+        ...pendingRx.slice(0, 8).map((p) => ({
+          id: `rx-${p.id}`,
+          type: 'prescription' as const,
+          message: `Prescription pending: ${p.medication_name || 'Medication'} for ${p.patient_name || 'patient'}`,
+          entity_id: String(p.id),
+          entity_type: 'prescription' as const,
+          href: '/prescription',
+          read: false,
+          created_at: nowIso,
+        })),
+        ...lowStockMeds.slice(0, 8).map((med) => ({
+          id: `low-${med.id}`,
+          type: 'low_stock' as const,
+          message: `${med.name} is low on stock (${med.stock} left, min ${med.min_stock})`,
+          entity_id: String(med.id),
+          entity_type: 'medication' as const,
+          href: `/inventory?restock=${med.id}`,
+          read: false,
+          created_at: nowIso,
+        })),
+        ...expiringMeds.slice(0, 8).map((med) => ({
+          id: `exp-${med.id}`,
+          type: 'expiry' as const,
+          message: `${med.name} expires on ${med.expiry}`,
+          entity_id: String(med.id),
+          entity_type: 'medication' as const,
+          href: '/inventory',
+          read: false,
+          created_at: nowIso,
+        })),
+      ];
 
       setLowStockCount(lowStockCount);
       setPendingPrescriptions(pendingPrescriptions);
       setTotalStockValue(totalStockValue);
-      onSalesUpdate(salesData);
-
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.detail || err.message || 'Failed to load data';
-      setError(errorMsg);
-      console.error('Data fetch error:', err);
+      setNotifications(nextNotifications);
+    } catch (err) {
+      setError('Failed to load pharmacy data');
+      toast.error('Failed to load pharmacy data');
     } finally {
       setLoading(false);
     }
@@ -91,182 +196,122 @@ const PharmacySystem: React.FC<PharmacySystemProps> = ({
 
   useEffect(() => {
     fetchData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canViewPrescriptions]);
 
-  // Convert medication IDs to strings for compatibility
-  const getStringMedications = (): Medication[] => {
-    return medications.map(med => ({
-      ...med,
-      id: med.id.toString()
-    }));
+  useEffect(() => {
+    const onBranch = () => {
+      fetchData();
+      fetchMedications();
+    };
+    window.addEventListener('branch-changed', onBranch);
+    return () => window.removeEventListener('branch-changed', onBranch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canViewPrescriptions]);
+
+  const refreshData = async () => {
+    await fetchData();
+    await fetchMedications();
   };
 
-  const refreshData = async (tab: string) => {
+  const openModal = (type: string, item?: unknown) => {
+    setModalType(type);
+    setSelectedItem(item || null);
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setSelectedItem(null);
+    setModalType('');
+  };
+
+  const getStringMedications = () => medications;
+
+  const handleMedicationOperation = async (
+    operation: string,
+    medicationData?: Partial<Medication>,
+    id?: string
+  ) => {
     try {
-      setLoading(true);
-      
-      switch (tab) {
-        case 'inventory': {
-          const response = await api.medication.list();
-          const medicationsData = getArrayFromResponse<Medication>(response.data);
-          setMedications(medicationsData);
-          
-          const lowStockCount = medicationsData.filter(med => med.stock <= med.min_stock).length;
-          const totalStockValue = medicationsData.reduce((sum, med) => sum + (med.stock * med.price), 0);
-          
-          setLowStockCount(lowStockCount);
-          setTotalStockValue(totalStockValue);
-          break;
-        }
-        case 'prescriptions': {
-          const response = await api.prescription.list();
-          const prescriptionsData = getArrayFromResponse<Prescription>(response.data);
-          setPrescriptions(prescriptionsData);
-          
-          const pendingPrescriptions = prescriptionsData.filter(p => p.status === 'preparing').length;
-          setPendingPrescriptions(pendingPrescriptions);
-          break;
-        }
-        case 'customers': {
-          const response = await api.customer.list();
-          const customersData = getArrayFromResponse<Customer>(response.data);
-          setCustomers(customersData);
-          break;
-        }
-        case 'sales': {
-          const response = await api.sale.list();
-          const salesData = getArrayFromResponse<any>(response.data);
-          setSales(salesData);
-          onSalesUpdate(salesData);
-          break;
-        }
-        default:
-          await fetchData();
+      if (operation === 'create' && medicationData) {
+        await api.medication.create(medicationData);
+        toast.success('Medication created');
+      } else if (operation === 'update' && id && medicationData) {
+        await api.medication.update(id, medicationData);
+        toast.success('Medication updated');
+      } else if (operation === 'delete' && id) {
+        await api.medication.delete(id);
+        toast.success('Medication deleted');
       }
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.detail || err.message || 'Failed to refresh data';
-      toast.error(errorMsg);
-      console.error('Refresh error:', err);
-    } finally {
-      setLoading(false);
+      closeModal();
+      await refreshData();
+    } catch {
+      toast.error('Medication operation failed');
     }
   };
 
   const handleUpdatePrescriptionStatus = async (id: string, status: string) => {
     try {
       await api.prescription.updateStatus(id, status);
-      await refreshData('prescriptions');
-      toast.success('Prescription status updated successfully!');
-    } catch (err: any) {
-      toast.error(`Failed to update status: ${err.response?.data?.detail || err.message}`);
+      toast.success('Prescription updated');
+      await refreshData();
+    } catch {
+      toast.error('Failed to update prescription');
     }
   };
 
-  const handleMedicationOperation = async (
-    operation: string,
-    medicationData?: any,
-    id?: string | number
-  ) => {
+  const handleSaveSale = async (saleData: Record<string, unknown>) => {
     try {
-      let response;
-      
-      switch (operation) {
-        case 'create':
-          response = await api.medication.create(medicationData);
-          toast.success('Medication added successfully!');
-          break;
-        case 'update':
-          response = await api.medication.update(id!.toString(), medicationData);
-          toast.success('Medication updated successfully!');
-          break;
-        case 'delete':
-          await api.medication.delete(id!.toString());
-          toast.success('Medication deleted successfully!');
-          break;
-        default:
-          throw new Error('Invalid operation');
-      }
-      
-      await refreshData('inventory');
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.detail || err.message || 'Operation failed';
-      toast.error(errorMsg);
-      console.error('Medication operation error:', err);
+      await api.sale.create(saleData);
+      toast.success('Sale recorded');
+      closeModal();
+      await refreshData();
+    } catch {
+      toast.error('Failed to create sale');
+      throw new Error('sale failed');
     }
   };
 
-  const handleRestock = async (restockData: any) => {
-    try {
-      await api.restock.create(restockData);
-      await refreshData('inventory');
-      toast.success('Restock recorded successfully!');
-    } catch (err: any) {
-      toast.error(`Failed to record restock: ${err.response?.data?.detail || err.message}`);
-    }
-  };
-
-  const handleSaveSale = async (saleData: any): Promise<void> => {
-    try {
-      const response = await api.sale.create(saleData);
-      
-      // Update medication stock
-      const updatedMedications = [...medications];
-      saleData.items.forEach((item: any) => {
-        const medIndex = updatedMedications.findIndex(m => m.id.toString() === item.medication.toString());
-        if (medIndex !== -1) {
-          updatedMedications[medIndex].stock -= item.quantity;
-        }
-      });
-      
-      setMedications(updatedMedications);
-      setSales(prev => [...prev, response.data]);
-      toast.success('Sale created successfully!');
-    } catch (err: any) {
-      toast.error(`Failed to create sale: ${err.response?.data?.detail || err.message}`);
-    }
-  };
-
-  const openModal = (type: string, item?: any) => {
-    setModalType(type);
-    setSelectedItem(item ?? null);
-    setShowModal(true);
-  };
-
-  const closeModal = () => {
-    setShowModal(false);
-    setModalType('');
-    setSelectedItem(null);
-  };
-
-  // Create base props to pass to all pages
   const baseProps = {
     loading,
     error,
     medications: getStringMedications(),
-    prescriptions, // Pass prescriptions as-is, with id as number
+    prescriptions,
     customers,
     sales,
     onOpenModal: openModal,
     onRefresh: refreshData,
     onMedicationOperation: handleMedicationOperation,
-    onUpdateStatus: handleUpdatePrescriptionStatus
+    onUpdateStatus: handleUpdatePrescriptionStatus,
   };
 
   const renderActiveTab = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard {...baseProps} setActiveTab={setActiveTab} />;
+        return (
+          <Dashboard
+            {...baseProps}
+            setActiveTab={setActiveTab}
+            onRestockMedication={(id) => navigate(`/inventory?restock=${id}`)}
+          />
+        );
       case 'inventory':
         return <Inventory {...baseProps} />;
       case 'prescription':
-      case 'prescriptions':
         return <Prescriptions />;
       case 'customers':
         return <Customers {...baseProps} />;
+      case 'pos':
+        return <POS />;
       case 'sales':
         return <Sales />;
       case 'sales-transactions':
         return <SalesTransactions {...baseProps} />;
+      case 'restock':
+        return <RestockPage onRefresh={refreshData} />;
+      case 'branches':
+        return <Branches />;
       case 'settings':
         return <Settings />;
       default:
@@ -274,38 +319,33 @@ const PharmacySystem: React.FC<PharmacySystemProps> = ({
     }
   };
 
-  // Get customer list for modal
-  const getCustomerList = () => {
-    return customers.map(c => ({
+  const getCustomerList = () =>
+    customers.map((c) => ({
       id: c.id,
       name: c.name,
       phone: c.phone,
-      insurance: c.insurance
+      insurance: c.insurance,
     }));
-  };
 
   return (
     <>
       {renderActiveTab()}
       {showModal && (
-        <Modal 
-          type={modalType} 
-          item={selectedItem} 
+        <Modal
+          type={modalType}
+          item={selectedItem}
           onClose={closeModal}
-          onSaveMedication={(medicationData, isEdit) => 
+          onSaveMedication={(medicationData, isEdit) =>
             handleMedicationOperation(
-              isEdit ? 'update' : 'create', 
+              isEdit ? 'update' : 'create',
               medicationData,
-              isEdit ? selectedItem.id : undefined
+              isEdit ? (selectedItem as { id: string }).id : undefined
             )
           }
-          onDeleteMedication={(id) => 
-            handleMedicationOperation('delete', undefined, id)
-          }
+          onDeleteMedication={(id) => handleMedicationOperation('delete', undefined, String(id))}
           onSaveSale={handleSaveSale}
-          onSaveRestock={handleRestock}
           medications={getStringMedications()}
-          customers={getCustomerList()} // Pass customers to modal
+          customers={getCustomerList()}
         />
       )}
     </>

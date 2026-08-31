@@ -1,8 +1,7 @@
 // Enhanced Prescription Creation Modal
 import React, { useState, useEffect } from 'react';
-import { X, User, Pill, Calendar, AlertTriangle, Save, Plus } from 'lucide-react';
+import { X, User, Pill, Calendar, Save } from 'lucide-react';
 import { PrescriptionFormData, Customer, Medication } from '../../types';
-import api from '../../services/api';
 import apiClient from '../../utils/axios';
 
 interface PrescriptionModalProps {
@@ -18,12 +17,12 @@ const PrescriptionModal: React.FC<PrescriptionModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  customers,
+  customers: _customers,
   medications,
   editPrescription
 }) => {
   const [formData, setFormData] = useState<PrescriptionFormData>({
-    customer: '',
+    patient_name: '',
     medication: '',
     quantity_prescribed: 1,
     dosage: '',
@@ -50,7 +49,6 @@ const PrescriptionModal: React.FC<PrescriptionModalProps> = ({
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [selectedMedication, setSelectedMedication] = useState<Medication | null>(null);
 
   // Set default expiry date (30 days from prescribed date)
@@ -66,18 +64,28 @@ const PrescriptionModal: React.FC<PrescriptionModalProps> = ({
     }
   }, [formData.prescribed_date]);
 
-  // Update selected customer when customer ID changes
   useEffect(() => {
-    const customer = customers.find(c => c.id === formData.customer);
-    setSelectedCustomer(customer || null);
-    if (customer) {
-      setFormData(prev => ({
-        ...prev,
-        allergies: customer.allergies || '',
-        insurance_provider: customer.insurance || ''
-      }));
-    }
-  }, [formData.customer, customers]);
+    if (!editPrescription) return;
+    setFormData((prev) => ({
+      ...prev,
+      patient_name: editPrescription.patient_name || editPrescription.customer_name || '',
+      medication: editPrescription.medication || '',
+      quantity_prescribed: editPrescription.quantity_prescribed || 1,
+      dosage: editPrescription.dosage || '',
+      frequency: editPrescription.frequency || '',
+      duration: editPrescription.duration || '',
+      administration_route: editPrescription.administration_route || 'Oral',
+      priority: editPrescription.priority || 'normal',
+      prescribed_by: editPrescription.prescribed_by || '',
+      doctor_license: editPrescription.doctor_license || '',
+      doctor_phone: editPrescription.doctor_phone || '',
+      allergies: editPrescription.allergies || '',
+      diagnosis: editPrescription.diagnosis || '',
+      notes: editPrescription.notes || '',
+      patient_age: editPrescription.patient_age,
+      patient_weight: editPrescription.patient_weight,
+    }));
+  }, [editPrescription]);
 
   // Update selected medication when medication ID changes
   useEffect(() => {
@@ -101,8 +109,7 @@ const PrescriptionModal: React.FC<PrescriptionModalProps> = ({
     setError(null);
 
     try {
-      // Validate required fields
-      if (!formData.customer || !formData.medication || !formData.prescribed_by) {
+      if (!formData.patient_name.trim() || !formData.medication || !formData.prescribed_by) {
         throw new Error('Please fill in all required fields');
       }
 
@@ -115,14 +122,26 @@ const PrescriptionModal: React.FC<PrescriptionModalProps> = ({
         throw new Error(`Insufficient stock. Available: ${selectedMedication.stock}`);
       }
 
+      const payload = {
+        ...formData,
+        patient_name: formData.patient_name.trim(),
+      };
+
       if (editPrescription) {
-        await apiClient.put(`/prescriptions/${editPrescription.id}/`, formData);
+        await apiClient.put(`/prescriptions/${editPrescription.id}/`, payload);
       } else {
-        await apiClient.post('/prescriptions/', formData);
+        await apiClient.post('/prescriptions/', payload);
       }
       onSuccess();
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Failed to save prescription');
+      const data = err.response?.data;
+      const detail =
+        (typeof data?.detail === 'string' && data.detail) ||
+        (typeof data?.patient_name?.[0] === 'string' && data.patient_name[0]) ||
+        (data && typeof data === 'object' && Object.values(data).flat().join(' ')) ||
+        err.message ||
+        'Failed to save prescription';
+      setError(detail);
     } finally {
       setLoading(false);
     }
@@ -167,38 +186,18 @@ const PrescriptionModal: React.FC<PrescriptionModalProps> = ({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Patient *
+                  Patient name *
                 </label>
-                <select
-                  name="customer"
-                  value={formData.customer}
+                <input
+                  type="text"
+                  name="patient_name"
+                  value={formData.patient_name}
                   onChange={handleInputChange}
                   required
+                  placeholder="Enter patient full name"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select a patient</option>
-                  {customers.map(customer => (
-                    <option key={customer.id} value={customer.id}>
-                      {customer.name} - {customer.phone}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
-
-              {selectedCustomer && (
-                <div className="bg-blue-50 p-3 rounded-lg">
-                  <div className="text-sm text-blue-800">
-                    <div><strong>Email:</strong> {selectedCustomer.email}</div>
-                    <div><strong>Address:</strong> {selectedCustomer.address}</div>
-                    <div><strong>DOB:</strong> {new Date(selectedCustomer.dob).toLocaleDateString()}</div>
-                    {selectedCustomer.allergies && (
-                      <div className="text-red-600">
-                        <strong>Allergies:</strong> {selectedCustomer.allergies}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

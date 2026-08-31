@@ -52,6 +52,7 @@ interface DashboardProps {
   sales: Sale[];
   customers: Customer[];
   setActiveTab?: (tab: string) => void;
+  onRestockMedication?: (medicationId: string) => void;
 }
 
 const COLORS = ['#34d399', '#60a5fa', '#fbbf24', '#a78bfa', '#f472b6', '#f87171'];
@@ -63,7 +64,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   prescriptions = [],
   sales = [],
   customers = [],
-  setActiveTab
+  setActiveTab,
+  onRestockMedication,
 }) => {
   const [timeFilter, setTimeFilter] = useState<'week' | 'month' | 'year'>('month');
   
@@ -227,7 +229,18 @@ const Dashboard: React.FC<DashboardProps> = ({
                   <div className="font-medium">{item.name}</div>
                   <div className="text-sm text-gray-600">{item.category}</div>
                 </div>
-                <StockBadge stock={item.stock} minStock={item.min_stock} />
+                <div className="flex items-center gap-2">
+                  <StockBadge stock={item.stock} minStock={item.min_stock} />
+                  {onRestockMedication && (
+                    <button
+                      type="button"
+                      onClick={() => onRestockMedication(String(item.id))}
+                      className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+                    >
+                      Restock
+                    </button>
+                  )}
+                </div>
               </div>
             ))
           )}

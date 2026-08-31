@@ -1,25 +1,41 @@
 from django.contrib import admin
 from django.urls import path, include
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from rest_framework.authtoken.views import obtain_auth_token
-from django.http import JsonResponse
+from django.shortcuts import render
 from rest_framework.routers import DefaultRouter
 from core.views import (
-    MedicationViewSet, 
-    SaleViewSet, 
+    MedicationViewSet,
+    SaleViewSet,
     InvoicePDFView,
-    ReceiptPDFView, # Make sure this is imported
+    ReceiptPDFView,
     CustomerViewSet,
     PrescriptionViewSet,
     SaleItemViewSet,
     RestockViewSet,
+    DiscountViewSet,
+    PromotionViewSet,
+    TaxRateViewSet,
+    DiscountRateViewSet,
+    AuditTrailViewSet,
+    StockMovementViewSet,
     MedicationListForSale,
     profile_view,
+    change_password,
+    register_user,
+    logout_view,
+    csrf_cookie_view,
+    CustomTokenObtainPairView,
+    CustomTokenRefreshView,
+    UserViewSet,
+    BusinessDayViewSet,
+    pharmacy_profile_view,
+    BranchViewSet,
     SalesAnalyticsView,
-    DashboardAnalyticsView
+    DashboardAnalyticsView,
+    HealthCheckView,
+    LivenessView,
 )
+from core.health import StatusDashboardView
 
-# Create router and register viewsets
 router = DefaultRouter()
 router.register(r'medications', MedicationViewSet)
 router.register(r'sales', SaleViewSet)
@@ -27,51 +43,50 @@ router.register(r'customers', CustomerViewSet)
 router.register(r'prescriptions', PrescriptionViewSet)
 router.register(r'sale-items', SaleItemViewSet)
 router.register(r'restocks', RestockViewSet)
+router.register(r'users', UserViewSet)
+router.register(r'business-days', BusinessDayViewSet, basename='business-days')
+router.register(r'branches', BranchViewSet, basename='branches')
+router.register(r'discounts', DiscountViewSet)
+router.register(r'promotions', PromotionViewSet)
+router.register(r'tax-rates', TaxRateViewSet, basename='tax-rates')
+router.register(r'discount-rates', DiscountRateViewSet, basename='discount-rates')
+router.register(r'audit-trail', AuditTrailViewSet)
+router.register(r'stock-movements', StockMovementViewSet)
+
 
 def root_view(request):
-    return JsonResponse({
-        "message": "Welcome to the Pharmacy System API",
-        "endpoints": {
-            "medications": "/api/medications/",
-            "medications_available": "/api/medications/available/",
-            "sales": "/api/sales/",
-            "customers": "/api/customers/",
-            "prescriptions": "/api/prescriptions/",
-            "sale_items": "/api/sale-items/",
-            "restocks": "/api/restocks/",
-            "analytics_sales": "/api/analytics/sales/",
-            "analytics_dashboard": "/api/analytics/dashboard/",
-            "token_obtain": "/api/token/",
-            "token_refresh": "/api/token/refresh/",
-            "user_profile": "/api/profile/",
-            "invoice": "/api/sales/<sale_id>/invoice/",
-            "receipt_api": "/api/receipt/<sale_id>/",
-            "receipt_direct": "/receipt/<sale_id>/"
-        }
-    })
+    return render(request, 'core/index.html')
+
+
+api_v1_patterns = [
+    path('', include(router.urls)),
+
+    path('analytics/sales/', SalesAnalyticsView.as_view(), name='sales-analytics'),
+    path('analytics/dashboard/', DashboardAnalyticsView.as_view(), name='dashboard-analytics'),
+
+    path('medications/available/', MedicationListForSale.as_view(), name='medications-available'),
+
+    path('profile/', profile_view, name='user-profile'),
+    path('auth/register/', register_user, name='register-user'),
+    path('auth/change-password/', change_password, name='change-password'),
+    path('auth/logout/', logout_view, name='logout'),
+    path('auth/csrf/', csrf_cookie_view, name='csrf-cookie'),
+    path('pharmacy-profile/', pharmacy_profile_view, name='pharmacy-profile'),
+
+    path('sales/<uuid:sale_id>/invoice/', InvoicePDFView.as_view(), name='sale-invoice'),
+    path('receipt/<uuid:sale_id>/', ReceiptPDFView.as_view(), name='receipt-pdf-api'),
+
+    path('health/', HealthCheckView.as_view(), name='health-check'),
+    path('health/live/', LivenessView.as_view(), name='health-liveness'),
+
+    path('token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('token/refresh/', CustomTokenRefreshView.as_view(), name='token_refresh'),
+]
 
 urlpatterns = [
     path('', root_view, name='root'),
     path('admin/', admin.site.urls),
-    
-    # API endpoints
-    path('api/', include(router.urls)),
-    
-    # Analytics endpoints
-    path('api/analytics/sales/', SalesAnalyticsView.as_view(), name='sales-analytics'),
-    path('api/analytics/dashboard/', DashboardAnalyticsView.as_view(), name='dashboard-analytics'),
-    
-    # Additional custom endpoints
-    path('api/medications/available/', MedicationListForSale.as_view(), name='medications-available'),
-    path('api/profile/', profile_view, name='user-profile'),
-    path('api/sales/<uuid:sale_id>/invoice/', InvoicePDFView.as_view(), name='sale-invoice'),
-    path('api/receipt/<uuid:sale_id>/', ReceiptPDFView.as_view(), name='receipt-pdf-api'),
-    
-    # Direct receipt path for frontend
+    path('status/', StatusDashboardView.as_view(), name='status-dashboard'),
+    path('api/v1/', include(api_v1_patterns)),
     path('receipt/<uuid:sale_id>/', ReceiptPDFView.as_view(), name='receipt-direct'),
-    
-    # Authentication endpoints
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('api-token-auth/', obtain_auth_token, name='api_token_auth'),
 ]

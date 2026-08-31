@@ -123,24 +123,24 @@ export const SalesContextProvider: React.FC<{ children: React.ReactNode }> = ({
           qty,
         }));
 
-        // Capitalize payment_method for backend display value
-        const paymentMethodDisplay = sale.payment_method.charAt(0).toUpperCase() + sale.payment_method.slice(1).replace('_', ' ');
-
+        // Walk-in sales send null customer; payment uses model keys (cash, card, …)
         const completeSale: any = {
-          customer: sale.customer === '0' ? '1302598e-d2b7-4048-b43e-96bf3851529a' : sale.customer,
-          customer_name: sale.customer_name,
+          customer: !sale.customer || sale.customer === '0' ? null : sale.customer,
+          customer_name: sale.customer_name || 'Walk-in Customer',
           date: sale.date,
           total: sale.total,
           subtotal: sale.subtotal,
           discount_total: sale.discount_total,
-          payment_method: paymentMethodDisplay,
+          payment_method: (() => {
+            const raw = String(sale.payment_method || 'cash').toLowerCase().trim().replace(/\s+/g, '_');
+            if (raw === 'insurance_copay') return 'insurance-copay';
+            return raw;
+          })(),
           notes: sale.notes,
           items: cleanedItems,
         };
 
-        console.log('Sending sale data:', completeSale);
         const response = await saleAPI.sale.create(completeSale);
-        console.log('Sale creation response:', response.data);
         const formattedSale = formatSaleData(response.data);
 
         for (const update of stockUpdates) {

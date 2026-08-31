@@ -1,46 +1,267 @@
-# OS / editor junk
-.DS_Store
-Thumbs.db
-*.swp
-*.swo
-*.log
+################################################################################
+# GIT SECURITY: SECRETS & CREDENTIALS
+################################################################################
 
-# Python / Django
+# CRITICAL: Environment files with secrets
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.staging
+.env.*.secret
+.env.*.key
+
+# Configuration files with secrets
+.aws/
+.ssh/
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+secrets.json
+private.pem
+settings_secrets.py
+
+# Database backups with data
+*.sql
+*.sql.gz
+*.backup
+*.dump
+
+# Keep examples (no secrets)
+!.env.example
+!.env.postgres.example
+!.env.*.example
+
+################################################################################
+# PYTHON / DJANGO
+################################################################################
+
+# Python compiled files
 __pycache__/
 *.py[cod]
 *.pyc
 *.pyo
 *.pyd
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+PIPFIE.lock
+
+# Testing & coverage
 .pytest_cache/
-.mypy_cache/
-.ruff_cache/
+.tox/
 .coverage
+.coverage.*
+coverage.xml
+*.cover
 htmlcov/
+.hypothesis/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Django
 db.sqlite3
+db.sqlite3-journal
+db.sqlite3.backup.*
+staticfiles/
+**/staticfiles/
+/media/
+/logs/
+**/logs/
+*.log
+local_settings.py
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
 
 # Virtual environments
 .venv/
 venv/
 env/
+ENV/
+env.bak/
+venv.bak/
 
-# Django static/media
-staticfiles/
-media/
+# Ruff, mypy, other linters
+.ruff_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
 
-# Environment and secrets
-.env
-.env.*
-!.env.example
-!.env.production.example
+################################################################################
+# NODE / REACT / FRONTEND
+################################################################################
 
-# Node / frontend
-node_modules/
-dist/
-build/
+# Dependencies
+/node_modules/
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Production build
+/build/
+/dist/
+/.next/
+out/
+.nuxt
+
+# Misc
+.DS_Store
+*.pem
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+npm-error.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# TypeScript
 *.tsbuildinfo
 
-# IDE / tooling
-.idea/
-.vscode/
-*.code-workspace
+################################################################################
+# IDE / EDITORS
+################################################################################
 
+.vscode/
+.idea/
+*.code-workspace
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# VS Code
+.vscode/launch.json
+.vscode/settings.json
+.vscode/*.code-workspace
+
+################################################################################
+# OS SPECIFIC
+################################################################################
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+.localized
+
+# Linux
+.directory
+
+################################################################################
+# DOCKER
+################################################################################
+
+.docker/
+docker-compose.override.yml
+.dockerignore
+
+################################################################################
+# GIT SPECIFIC
+################################################################################
+
+.git-crypt/
+.gitattributes.local
+
+################################################################################
+# BUILD ARTIFACTS
+################################################################################
+
+*.o
+*.a
+*.lib
+*.dll
+*.dylib
+*.exe
+*.out
+*.app
+
+################################################################################
+# TEMPORARY FILES
+################################################################################
+
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.~*
+.*.swp
+.*.swo
+*.*~
+*.bak
+*.backup
+.cache/
+.tmp/
+.temp/
+
+################################################################################
+# PROJECT SPECIFIC (LizzyMike Pharma)
+################################################################################
+
+# Database backups
+db.sqlite3.backup.*
+migration_*.log
+
+# Backup scripts output
+*.backup.*
+*.dump.*
+
+# Local development overrides
+local_settings.py
+settings_local_*.py
+
+# IDE extensions for this project
+pyrightconfig.json
+
+# Nginx local
+nginx_local.conf
+
+# Windows batch files with secrets
+start_server_local.bat
+setup_local.bat
+
+# Keep documentation and examples
+!.env.example
+!.env.postgres.example
+!*.env.template
+
+
+nul
+NUL

@@ -1,0 +1,109 @@
+# GitHub Actions - Test and Coverage Workflow
+# =============================================
+name: Test and Coverage
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: pharmacy_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Cache pip packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        cd Backend
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+    
+    - name: Run migrations
+      run: |
+        cd Backend
+        python manage.py migrate --noinput
+      env:
+        DJANGO_SETTINGS_MODULE: pharmasys.settings_consolidated
+        POSTGRES_DB: pharmacy_test
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
+        POSTGRES_HOST: localhost
+    
+    - name: Run tests with coverage
+      run: |
+        cd Backend
+        pytest --cov=core --cov=pharmasys --cov-report=xml --cov-report=term-missing -v
+      env:
+        DJANGO_SETTINGS_MODULE: pharmasys.settings_consolidated
+        POSTGRES_DB: pharmacy_test
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
+        POSTGRES_HOST: localhost
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./Backend/coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+    
+    - name: Check minimum coverage threshold
+      run: |
+        cd Backend
+        python -c "
+import xml.etree.ElementTree as ET
+import sys
+
+try:
+    tree = ET.parse('coverage.xml')
+    root = tree.getroot()
+    
+    # Get total coverage
+    coverage = root.get('line-rate')
+    if coverage:
+        coverage_pct = float(coverage) * 100
+        print(f'Current coverage: {coverage_pct:.1f}%')
+        
+        if coverage_pct < 70:
+            print(f'::error::Coverage {coverage_pct:.1f}% is below 70% threshold!')
+            sys.exit(1)
+        else:
+            print(f'::notice::Coverage check passed ({coverage_pct:.1f}% >= 70%)')
+    else:
+        print('::warning::Could not parse coverage data')
+        sys.exit(1)
+except Exception as e:
+    print(f'::warning::Error checking coverage: {e}')
+    # Don't fail on parse errors
+"

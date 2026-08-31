@@ -1,184 +1,111 @@
 """
-Security utilities for the pharmacy system
+Security utilities for LizzyMike Pharma.
+
+Only safe, correct utilities are included here.  The removed items were:
+
+* ``DataEncryption.encrypt_sensitive_data`` — SHA-256 is a *hash*, not
+  encryption; the original data cannot be recovered.
+* ``DataEncryption.hash_password`` — used the current timestamp as a salt,
+  which is predictable and not stored, making verification impossible.
+  Django's own auth system (``AbstractUser``) handles password hashing
+  correctly using PBKDF2 + a random salt.
+
+Do NOT add any custom password hashing.  Always use Django's built-in system.
 """
 import logging
+import ipaddress
+
 from django.core.cache import cache
 from django.http import HttpRequest
 from django.utils import timezone
 from django.core.exceptions import PermissionDenied
-from django.contrib.auth import get_user_model
-from django.db import models
-import hashlib
-import ipaddress
 
-User = get_user_model()
 logger = logging.getLogger(__name__)
 
-class SecurityMiddleware:
-    """Custom security middleware for additional protection"""
-    
-    def __init__(self, get_response):
-        self.get_response = get_response
-    
-    def __call__(self, request):
-        # Rate limiting by IP
-        self.check_rate_limit(request)
-        
-        # Log suspicious activity
-        self.log_suspicious_activity(request)
-        
-        response = self.get_response(request)
-        
-        # Add security headers
-        self.add_security_headers(response)
-        
-        return response
-    
-    def check_rate_limit(self, request):
-        """Implement rate limiting"""
-        ip = self.get_client_ip(request)
-        cache_key = f"rate_limit_{ip}"
-        
-        # Check if IP is blocked
-        if cache.get(f"blocked_{ip}"):
-            raise PermissionDenied("IP address is temporarily blocked")
-        
-        # Count requests
-        requests = cache.get(cache_key, 0)
-        if requests > 100:  # 100 requests per minute
-            cache.set(f"blocked_{ip}", True, timeout=300)  # Block for 5 minutes
-            logger.warning(f"IP {ip} blocked due to rate limiting")
-            raise PermissionDenied("Too many requests")
-        
-        cache.set(cache_key, requests + 1, timeout=60)
-    
-    def log_suspicious_activity(self, request):
-        """Log suspicious activity"""
-        ip = self.get_client_ip(request)
-        user_agent = request.META.get('HTTP_USER_AGENT', '')
-        
-        # Check for suspicious patterns
-        suspicious_patterns = [
-            'sqlmap', 'nikto', 'nmap', 'masscan',
-            'admin', 'phpmyadmin', 'wp-admin',
-            'script', 'javascript', 'eval('
-        ]
-        
-        for pattern in suspicious_patterns:
-            if pattern.lower() in request.path.lower() or pattern.lower() in user_agent.lower():
-                logger.warning(f"Suspicious activity detected from IP {ip}: {request.path}")
-                break
-    
-    def add_security_headers(self, response):
-        """Add security headers"""
-        response['X-Content-Type-Options'] = 'nosniff'
-        response['X-Frame-Options'] = 'DENY'
-        response['X-XSS-Protection'] = '1; mode=block'
-        response['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-        response['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-        response['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
-    
-    def get_client_ip(self, request):
-        """Get client IP address"""
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0]
-        else:
-            ip = request.META.get('REMOTE_ADDR')
-        return ip
 
+# ---------------------------------------------------------------------------
+# IP helpers
+# ---------------------------------------------------------------------------
 
 def get_client_ip(request: HttpRequest) -> str | None:
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        return x_forwarded_for.split(',')[0]
+    xff = request.META.get('HTTP_X_FORWARDED_FOR')
+    if xff:
+        return xff.split(',')[0].strip()
     return request.META.get('REMOTE_ADDR')
 
-class AuditLogger:
-    """Audit logging for security events"""
-    
-    @staticmethod
-    def log_login_attempt(user, ip, success=True):
-        """Log login attempts"""
-        status = "SUCCESS" if success else "FAILED"
-        logger.info(f"Login attempt: {user} from {ip} - {status}")
-    
-    @staticmethod
-    def log_permission_denied(user, resource, action):
-        """Log permission denied events"""
-        logger.warning(f"Permission denied: {user} attempted {action} on {resource}")
-    
-    @staticmethod
-    def log_data_access(user, resource, action):
-        """Log data access events"""
-        logger.info(f"Data access: {user} performed {action} on {resource}")
 
-class DataEncryption:
-    """Data encryption utilities"""
-    
+# ---------------------------------------------------------------------------
+# Audit logging helpers
+# ---------------------------------------------------------------------------
+
+class AuditLogger:
+    """Structured audit-logging helpers for security events."""
+
     @staticmethod
-    def encrypt_sensitive_data(data):
-        """Encrypt sensitive data"""
-        # In production, use proper encryption like Fernet
-        return hashlib.sha256(data.encode()).hexdigest()
-    
+    def log_login_attempt(username: str, ip: str, success: bool = True) -> None:
+        level = logging.INFO if success else logging.WARNING
+        logger.log(
+            level,
+            "Login attempt: user=%r ip=%s success=%s",
+            username, ip, success,
+        )
+
     @staticmethod
-    def hash_password(password):
-        """Hash password with salt"""
-        salt = timezone.now().isoformat()
-        return hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
+    def log_permission_denied(user, resource: str, action: str) -> None:
+        logger.warning(
+            "Permission denied: user=%r action=%r resource=%r",
+            getattr(user, 'username', str(user)), action, resource,
+        )
+
+    @staticmethod
+    def log_data_access(user, resource: str, action: str) -> None:
+        logger.info(
+            "Data access: user=%r action=%r resource=%r",
+            getattr(user, 'username', str(user)), action, resource,
+        )
+
+
+# ---------------------------------------------------------------------------
+# IP whitelist helper
+# ---------------------------------------------------------------------------
 
 class IPWhitelist:
-    """IP whitelist management"""
-    
-    @staticmethod
-    def is_ip_allowed(ip):
-        """Check if IP is in whitelist"""
-        # In production, maintain a database of allowed IPs
-        allowed_ips = [
-            '127.0.0.1',
-            '::1',
-            # Add your trusted IPs here
-        ]
-        
+    """Simple IP allowlist checker (extend via settings/DB for production)."""
+
+    ALLOWED = {'127.0.0.1', '::1'}
+
+    @classmethod
+    def is_ip_allowed(cls, ip: str) -> bool:
         try:
-            ip_obj = ipaddress.ip_address(ip)
-            for allowed_ip in allowed_ips:
-                if ip_obj == ipaddress.ip_address(allowed_ip):
-                    return True
+            return ipaddress.ip_address(ip) in {
+                ipaddress.ip_address(a) for a in cls.ALLOWED
+            }
         except ValueError:
-            pass
-        
-        return False
+            return False
+
+
+# ---------------------------------------------------------------------------
+# Session security helper
+# ---------------------------------------------------------------------------
 
 class SessionSecurity:
-    """Session security utilities"""
-    
+    """Detect session hijacking by IP address comparison."""
+
     @staticmethod
-    def invalidate_user_sessions(user_id):
-        """Invalidate all sessions for a user"""
-        # In production, use Redis or database to track sessions
-        cache.delete_pattern(f"session_{user_id}_*")
-    
-    @staticmethod
-    def check_session_security(request):
-        """Check session security"""
+    def check_session_security(request: HttpRequest) -> bool:
         if not request.user.is_authenticated:
             return True
-        
-        # Check for session hijacking
+
         current_ip = get_client_ip(request)
-        stored_ip = request.session.get('ip_address')
-        
+        stored_ip  = request.session.get('ip_address')
+
         if stored_ip and stored_ip != current_ip:
-            logger.warning(f"Session hijacking attempt detected for user {request.user.id}")
+            logger.warning(
+                "Possible session hijacking: user=%r session ip=%r current ip=%r",
+                request.user.id, stored_ip, current_ip,
+            )
             request.session.flush()
             return False
-        
+
         request.session['ip_address'] = current_ip
         return True
-
-
-
-
-

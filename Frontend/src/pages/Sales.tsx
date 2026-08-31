@@ -1,8 +1,7 @@
-// src/pages/Sales.tsx
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, FileText, DollarSign, Printer, Percent, ArrowUpRight, RefreshCw } from 'lucide-react';
 import { useSalesContext } from '../contexts/SalesContext';
-import NewSaleForm from '../components/Sales/NewSaleForm';
 import { Sale } from '../types';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -57,14 +56,15 @@ const StatCard: React.FC<{ title: string; value: string; icon: React.ReactNode; 
 );
 
 const Sales: React.FC = () => {
-  const { sales, loading, error, addSale } = useSalesContext();
+  const navigate = useNavigate();
+  const { sales, loading, error } = useSalesContext();
   const { medications } = useMedicationContext();
   const [timeRange, setTimeRange] = useState('today');
-  const [showNewSaleForm, setShowNewSaleForm] = useState(false);
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [comparisonPeriod, setComparisonPeriod] = useState<'previous_period' | 'previous_year'>('previous_period');
   const [wsSales, setWsSales] = useState<Sale[]>([]);
+  const [receiptSale, setReceiptSale] = useState<Sale | null>(null);
 
   // Create customer map for ID to name lookup
   const customerMap = useMemo(() => {
@@ -169,7 +169,7 @@ const Sales: React.FC = () => {
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-800">Sales & Reports</h2>
         <button 
-          onClick={() => setShowNewSaleForm(true)}
+          onClick={() => navigate('/pos')}
           className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
         >
           <Plus className="h-4 w-4" />
@@ -298,7 +298,7 @@ const Sales: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap">{new Date(sale.date).toLocaleDateString()}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {/* Fixed customer display */}
-                        {customerMap[Number(sale.customer)] || `Customer ${sale.customer}`}
+                        {sale.customer_name || customerMap[Number(sale.customer)] || 'Walk-in Customer'}
                       </td>
                       <td className="px-6 py-4">
                         <div className="max-w-xs">
@@ -329,6 +329,8 @@ const Sales: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <button 
+                          type="button"
+                          onClick={() => setReceiptSale(sale)}
                           className="p-1 hover:bg-gray-100 rounded"
                           aria-label="View receipt"
                         >
@@ -374,16 +376,12 @@ const Sales: React.FC = () => {
         </div>
       </div>
       
-      {showNewSaleForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <NewSaleForm 
-            onClose={() => setShowNewSaleForm(false)}
-            onSaveSuccess={() => {
-              // Sales context will automatically update
-              setShowNewSaleForm(false);
-            }}
-          />
-        </div>
+      {receiptSale && (
+        <ReceiptGenerator
+          sale={receiptSale}
+          autoPrint
+          onClose={() => setReceiptSale(null)}
+        />
       )}
     </div>
   );

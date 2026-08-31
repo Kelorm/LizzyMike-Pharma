@@ -40,7 +40,7 @@ services:
       context: ./pharmasys
       dockerfile: Dockerfile
     environment:
-      - DJANGO_SETTINGS_MODULE=pharmasys.settings_production
+      - DJANGO_SETTINGS_MODULE=pharmasys.settings_consolidated
       - DB_HOST=db
       - DB_PORT=5432
       - REDIS_URL=redis://redis:6379/0
@@ -72,7 +72,7 @@ services:
       dockerfile: Dockerfile
     command: celery -A pharmasys worker --loglevel=info
     environment:
-      - DJANGO_SETTINGS_MODULE=pharmasys.settings_production
+      - DJANGO_SETTINGS_MODULE=pharmasys.settings_consolidated
       - DB_HOST=db
       - DB_PORT=5432
       - REDIS_URL=redis://redis:6379/0
@@ -93,7 +93,7 @@ services:
       dockerfile: Dockerfile
     command: celery -A pharmasys beat --loglevel=info
     environment:
-      - DJANGO_SETTINGS_MODULE=pharmasys.settings_production
+      - DJANGO_SETTINGS_MODULE=pharmasys.settings_consolidated
       - DB_HOST=db
       - DB_PORT=5432
       - REDIS_URL=redis://redis:6379/0

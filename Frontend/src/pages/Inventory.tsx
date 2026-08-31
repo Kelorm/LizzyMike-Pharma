@@ -1,5 +1,6 @@
 // src/pages/Inventory.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Edit, Trash2, Download, Package } from 'lucide-react';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -7,15 +8,17 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
-import { RestockButton } from '../components/Restock';
+import { RestockButton, RestockForm } from '../components/Restock';
 
 import { Medication } from '../types';
+import { usePermissions } from '../hooks/usePermissions';
 
 interface InventoryProps {
   medications: Medication[];
   loading: boolean;
   error: string | null;
   onOpenModal: (type: string, item?: any) => void;
+  onRefresh?: () => void | Promise<void>;
   onMedicationOperation: (
     operation: string,
     medicationData?: any,
@@ -48,8 +51,17 @@ const Inventory: React.FC<InventoryProps> = ({
   error,
   medications,
   onOpenModal,
+  onRefresh,
   onMedicationOperation
 }) => {
+  const { hasPermission } = usePermissions();
+  const canAddMedication = hasPermission('add_medication');
+  const canEditMedication = hasPermission('edit_medication');
+  const canDeleteMedication = hasPermission('delete_medication');
+  const canCreateRestock = hasPermission('create_restock');
+  const canViewRestock = hasPermission('view_restock');
+  const showRestockActions = canCreateRestock || canViewRestock;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [showExpired, setShowExpired] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
@@ -59,17 +71,34 @@ const Inventory: React.FC<InventoryProps> = ({
   } | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pendingDeletion, setPendingDeletion] = useState<string[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [quickRestockMed, setQuickRestockMed] = useState<Medication | null>(null);
+
+  useEffect(() => {
+    const restockId = searchParams.get('restock');
+    if (restockId && medications.length) {
+      const med = medications.find((m) => String(m.id) === restockId);
+      if (med) {
+        setQuickRestockMed(med);
+        searchParams.delete('restock');
+        setSearchParams(searchParams, { replace: true });
+      }
+    }
+  }, [medications, searchParams, setSearchParams]);
 
   // Apply sorting
   const sortedMedications = useMemo(() => {
     const sortableItems = [...medications];
     if (sortConfig !== null) {
+      const { key, direction } = sortConfig;
       sortableItems.sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) {
-          return sortConfig.direction === 'asc' ? -1 : 1;
+        const aVal = a[key] ?? '';
+        const bVal = b[key] ?? '';
+        if (aVal < bVal) {
+          return direction === 'asc' ? -1 : 1;
         }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
-          return sortConfig.direction === 'asc' ? 1 : -1;
+        if (aVal > bVal) {
+          return direction === 'asc' ? 1 : -1;
         }
         return 0;
       });
@@ -80,7 +109,11 @@ const Inventory: React.FC<InventoryProps> = ({
   // Apply filtering
   const filteredMedications = useMemo(() => {
     return sortedMedications.filter((med) => {
-      const matchesSearch = med.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const q = searchTerm.toLowerCase();
+      const matchesSearch =
+        med.name.toLowerCase().includes(q) ||
+        (med.category || '').toLowerCase().includes(q) ||
+        (med.classification || '').toLowerCase().includes(q);
       const isExpired = new Date(med.expiry) < new Date();
       return matchesSearch && (showExpired ? isExpired : true);
     });
@@ -112,12 +145,13 @@ const Inventory: React.FC<InventoryProps> = ({
   };
 
   const exportToCSV = () => {
-    const headers = ['Name', 'Category', 'Stock', 'Min Stock', 'Price', 'Expiry', 'Batch'];
+    const headers = ['Name', 'Category', 'Classification', 'Stock', 'Min Stock', 'Price', 'Expiry', 'Batch'];
     const csvContent = [
       headers.join(','),
       ...medications.map(m => [
         `"${m.name}"`,
         m.category,
+        m.classification || '',
         m.stock,
         m.min_stock,
         m.price,
@@ -147,12 +181,14 @@ const Inventory: React.FC<InventoryProps> = ({
           >
             <Download className="h-4 w-4" /> Export CSV
           </button>
-          <button 
-            onClick={() => onOpenModal('addMedication')}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            <Plus className="h-4 w-4" /> Add Medication
-          </button>
+          {canAddMedication && (
+            <button 
+              onClick={() => onOpenModal('addMedication')}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4" /> Add Medication
+            </button>
+          )}
         </div>
       </div>
 
@@ -190,7 +226,7 @@ const Inventory: React.FC<InventoryProps> = ({
             <div className="ml-3 text-gray-700 font-medium">Show Expired</div>
           </label>
         </div>
-        {selected.length > 0 && (
+        {canDeleteMedication && selected.length > 0 && (
           <div className="flex items-center">
             <button
               onClick={handleBulkDelete}
@@ -207,7 +243,8 @@ const Inventory: React.FC<InventoryProps> = ({
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  <input 
+                {canDeleteMedication ? (
+                  <input 
                     type="checkbox" 
                     checked={selected.length === filteredMedications.length && filteredMedications.length > 0}
                     onChange={e => {
@@ -218,6 +255,7 @@ const Inventory: React.FC<InventoryProps> = ({
                       }
                     }}
                   />
+                ) : null}
               </th>
               <th 
                 className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
@@ -230,6 +268,15 @@ const Inventory: React.FC<InventoryProps> = ({
                 onClick={() => handleSort('category')}
               >
                 Category {sortConfig?.key === 'category' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+              </th>
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                onClick={() => handleSort('classification')}
+              >
+                Classification {sortConfig?.key === 'classification' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Batch
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Stock
@@ -257,7 +304,7 @@ const Inventory: React.FC<InventoryProps> = ({
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredMedications.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={10} className="px-6 py-4 text-center text-gray-500">
                   {searchTerm
                     ? 'No medications found matching your search.'
                     : 'No medications in inventory.'}
@@ -267,23 +314,31 @@ const Inventory: React.FC<InventoryProps> = ({
               filteredMedications.map((med) => (
                 <tr key={med.id} className={med.stock <= med.min_stock ? 'bg-red-50' : ''}>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(String(med.id))}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelected([...selected, String(med.id)]);
-                        } else {
-                          setSelected(selected.filter(id => id !== String(med.id)));
-                        }
-                      }}
-                    />
+                    {canDeleteMedication ? (
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(String(med.id))}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelected([...selected, String(med.id)]);
+                          } else {
+                            setSelected(selected.filter(id => id !== String(med.id)));
+                          }
+                        }}
+                      />
+                    ) : null}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
                     {med.name}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-gray-500">
                     {med.category}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                    {med.classification || '—'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-500 font-mono text-sm">
+                    {med.batch_no || '—'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <StockBadge stock={med.stock} minStock={med.min_stock} />
@@ -307,25 +362,32 @@ const Inventory: React.FC<InventoryProps> = ({
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div className="flex gap-2">
-                      <button
-                        aria-label="Edit medication"
-                        onClick={() => onOpenModal('editMedication', med)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        <Edit className="h-5 w-5" />
-                      </button>
-                      <button
-                        aria-label="Delete medication"
-                        onClick={() => onOpenModal('deleteMedication', med)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </button>
-                      <RestockButton 
-                        medication={med}
-                        size="sm"
-                        variant="outline"
-                      />
+                      {canEditMedication && (
+                        <button
+                          aria-label="Edit medication"
+                          onClick={() => onOpenModal('editMedication', med)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          <Edit className="h-5 w-5" />
+                        </button>
+                      )}
+                      {canDeleteMedication && (
+                        <button
+                          aria-label="Delete medication"
+                          onClick={() => onOpenModal('deleteMedication', med)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      )}
+                      {showRestockActions && (
+                        <RestockButton
+                          medication={med}
+                          size="sm"
+                          variant="outline"
+                          onRefresh={onRefresh}
+                        />
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -355,6 +417,17 @@ const Inventory: React.FC<InventoryProps> = ({
           </Button>
         </DialogActions>
       </Dialog>
+
+      {quickRestockMed && canCreateRestock && (
+        <RestockForm
+          medication={quickRestockMed}
+          onClose={() => setQuickRestockMed(null)}
+          onRestockSuccess={async () => {
+            setQuickRestockMed(null);
+            await onRefresh?.();
+          }}
+        />
+      )}
     </div>
   );
 };

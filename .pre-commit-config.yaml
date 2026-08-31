@@ -1,0 +1,163 @@
+repos:
+  # Check YAML/JSON syntax
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+        args: [--markdown-args=--fix]
+      - id: end-of-file-fixer
+        name: Fix end of file
+      - id: check-yaml
+        name: Check YAML
+        args: [--unsafe]
+      - id: check-json
+        name: Check JSON
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+      - id: check-added-large-files
+        name: Check for large files
+        args: [--maxkb=500]
+      - id: detect-private-key
+        name: Detect private keys
+      - id: mixed-line-ending
+        name: Fix mixed line endings
+
+  # Python import sorting with isort
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: Sort Python imports
+        args: [--profile=black, --line-length=88]
+        language_version: python3.11
+
+  # Python code formatting with Black
+  - repo: https://github.com/psf/black
+    rev: 24.1.1
+    hooks:
+      - id: black
+        name: Format with Black
+        language_version: python3.11
+        args: [--line-length=88]
+
+  # Python linting with Flake8
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        name: Lint with Flake8
+        language_version: python3.11
+        args: [--max-line-length=88, --extend-ignore=E203,W503]
+        additional_dependencies:
+          - flake8-docstrings
+          - flake8-bugbear
+          - flake8-comprehensions
+
+  # Type checking with mypy
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        name: Type check with mypy
+        language_version: python3.11
+        args: [--ignore-missing-imports, --no-implicit-optional]
+        additional_dependencies:
+          - types-all
+          - mypy-extensions
+          - django-stubs
+
+  # Security checks
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.5.1
+    hooks:
+      - id: forbid-crlf
+        name: Forbid CRLF
+      - id: forbid-tabs
+        name: Forbid tabs
+      - id: insert-license
+        name: Insert license headers
+        files: '\.(py|js|jsx|ts|tsx)$'
+        args:
+          - --license-filepath
+          - LICENSE
+          - --comment-style
+          - "#"
+        exclude: node_modules|migrations
+
+  # Detect debug print statements (Python)
+  - repo: https://github.com/pre-commit/mirrors-flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8-docstrings
+        name: Check for debug print statements
+        language_version: python3.11
+
+  # Detect leaked secrets (API keys, passwords in staged files)
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        name: Detect secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: package-lock\.json|yarn\.lock
+
+  # Detect .env files
+  - repo: local
+    hooks:
+      - id: check-env-file
+        name: Prevent .env file from being committed
+        entry: bash -c 'if grep -r "^\\.env" .gitignore > /dev/null 2>&1; then if git diff --cached --name-only | grep -E "^\\.env($|\\.)" > /dev/null; then echo "ERROR: .env files must not be committed"; exit 1; fi; fi'
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: forbid-hardcoded-db-password
+        name: Forbid known placeholder DB password leak pattern
+        entry: bash -c 'if git diff --cached | grep -E "LizzyMike@2024!" > /dev/null; then echo "ERROR: Hardcoded DB password pattern detected"; exit 1; fi'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
+
+      - id: debug-statements
+        name: Check for debug print/console statements
+        entry: bash -c 'if git diff --cached | grep -E "^\+.*print\(|^\+.*console\.(log|debug|error)\(" > /dev/null; then echo "ERROR: Debug print/console statements detected"; git diff --cached | grep -E "^\+.*print\(|^\+.*console\.(log|debug|error)\("; exit 1; fi'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
+
+      - id: no-commit-to-master
+        name: Don't commit to master branch
+        entry: bash -c 'if [ "$(git symbolic-ref --short HEAD)" = "master" ] || [ "$(git symbolic-ref --short HEAD)" = "main" ]; then echo "ERROR: Cannot commit to master/main branch directly"; exit 1; fi'
+        language: system
+        pass_filenames: false
+        always_run: true
+
+# Frontend: ESLint and Prettier are NOT in pre-commit
+# because they're best run as npm scripts in the Frontend directory
+# See Frontend/.eslintrc.json and Frontend/.prettierrc
+
+default_language_version:
+  python: python3.11
+  node: 18.0.0
+
+exclude: |
+  (?x)^(
+    Backend/migrations/|
+    Backend/staticfiles/|
+    Backend/venv/|
+    Backend/.venv/|
+    Frontend/node_modules/|
+    Frontend/build/|
+    Frontend/dist/|
+    \.git/
+  )
+ci:
+  autofix_commit_msg: 'chore: auto-format code with pre-commit hooks'
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: 'chore: update pre-commit hooks'
+  skip: [mypy]  # mypy often needs manual review
+  submodules: false

@@ -1,0 +1,153 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lizzymike-pharma"
+version = "2.0.0"
+description = "LizzyMike Pharmacy Management System"
+requires-python = ">=3.11"
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | migrations
+  | node_modules
+)/
+'''
+preview = true
+enable-unstable-feature = ["hug_parens_with_braces"]
+
+[tool.isort]
+profile = "black"
+py_version = "311"
+line_length = 88
+multi_line_mode = 3  # Vertical Hanging Indent
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+skip_glob = [
+    "*/migrations/*",
+    "*/staticfiles/*",
+    "*/venv/*",
+]
+known_django = ["django"]
+known_first_party = ["pharmasys", "core", "management"]
+sections = ["FUTURE", "STDLIB", "DJANGO", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+no_lines_before = ["LOCALFOLDER"]
+combine_as_imports = true
+force_single_line = false
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = [
+    "E203",  # whitespace before ':' - conflicts with black
+    "W503",  # line break before binary operator - conflicts with black
+    "W504",  # line break after binary operator
+]
+exclude = [
+    ".git",
+    "__pycache__",
+    "docs/source/conf.py",
+    "build",
+    "dist",
+    "migrations",
+    ".venv",
+    "venv",
+]
+per-file-ignores = [
+    "__init__.py:F401",  # unused imports in __init__.py are fine
+    "settings*.py:E501",  # long lines in settings are okay
+    "manage.py:D100",    # docstring not required for manage.py
+]
+
+[tool.mypy]
+python_version = "3.11"
+check_untyped_defs = true
+disallow_any_generics = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+disallow_untyped_defs = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_return_any = false
+warn_unused_configs = true
+warn_unused_ignores = true
+strict_optional = true
+strict_equality = true
+
+# Django plugin settings
+plugins = ["mypy_django_plugin.main"]
+
+[tool.django-stubs]
+django_settings_module = "pharmasys.settings_consolidated"
+
+[[tool.mypy.overrides]]
+module = [
+    "django.*",
+    "celery.*",
+    "psutil.*",
+    "decouple.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "*.migrations.*"
+ignore_errors = true
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "pharmasys.settings_consolidated"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+testpaths = ["core/tests", "management/tests"]
+addopts = "--strict-markers --tb=short --disable-warnings"
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Slow tests",
+    "django_db: Tests that require database access",
+]
+
+[tool.coverage.run]
+source = ["pharmasys", "core", "management"]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "manage.py",
+    "setup.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@abstractmethod",
+]
+
+[tool.pylint.messages_control]
+disable = [
+    "C0111",  # missing-docstring
+    "R0913",  # too-many-arguments
+    "W0212",  # protected-access
+    "C0103",  # invalid-name
+]
+
+[tool.pylint.format]
+max-line-length = 88

@@ -1,149 +1,90 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { TrendingUp, Package, DollarSign, Calendar, BarChart3, X } from 'lucide-react';
 import { Restock } from '../../types';
-import { API_BASE_URL } from '../../utils/axios';
+import api from '../../services/api';
 
 interface RestockAnalyticsProps {
   onClose: () => void;
 }
 
+type AnalyticsPayload = {
+  total_restocks: number;
+  total_quantity: number;
+  total_value: number;
+  average_cost: number;
+  top_suppliers: Array<{ supplier: string; total_quantity: number; total_value: string }>;
+  top_medications: Array<{ medication_name: string; total_quantity: number; total_value: string }>;
+  monthly_trend: Array<{ month: string; total_value: string; total_quantity: number }>;
+};
+
 const RestockAnalytics = ({ onClose }: RestockAnalyticsProps) => {
-  const [restocks, setRestocks] = useState<Restock[]>([]);
+  const [analytics, setAnalytics] = useState<AnalyticsPayload | null>(null);
+  const [recent, setRecent] = useState<Restock[]>([]);
   const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState<'week' | 'month' | 'quarter' | 'year'>('month');
 
   useEffect(() => {
-    fetchRestocks();
-  }, []);
-
-  const fetchRestocks = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/restocks/`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setRestocks(data.results || data);
+    const load = async () => {
+      try {
+        const [analyticsRes, listRes] = await Promise.all([
+          api.restock.analytics(),
+          api.restock.list(),
+        ]);
+        setAnalytics(analyticsRes.data);
+        const rows = Array.isArray(listRes.data) ? listRes.data : listRes.data.results || [];
+        setRecent(rows.slice(0, 5));
+      } catch {
+        setAnalytics(null);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Failed to fetch restocks:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getDateRange = () => {
-    const now = new Date();
-    const startDate = new Date();
-    
-    switch (timeRange) {
-      case 'week':
-        startDate.setDate(now.getDate() - 7);
-        break;
-      case 'month':
-        startDate.setMonth(now.getMonth() - 1);
-        break;
-      case 'quarter':
-        startDate.setMonth(now.getMonth() - 3);
-        break;
-      case 'year':
-        startDate.setFullYear(now.getFullYear() - 1);
-        break;
-    }
-    
-    return { startDate, endDate: now };
-  };
-
-  const filteredRestocks = restocks.filter(restock => {
-    const restockDate = new Date(restock.date_restocked);
-    const { startDate, endDate } = getDateRange();
-    return restockDate >= startDate && restockDate <= endDate;
-  });
-
-  const analytics = {
-    totalRestocks: filteredRestocks.length,
-    totalQuantity: filteredRestocks.reduce((sum, r) => sum + parseInt(r.quantity), 0),
-    totalValue: filteredRestocks.reduce((sum, r) => sum + parseFloat(r.total_cost), 0),
-    averageCost: filteredRestocks.length > 0 
-      ? filteredRestocks.reduce((sum, r) => sum + parseFloat(r.total_cost), 0) / filteredRestocks.length 
-      : 0,
-    topSuppliers: Object.entries(
-      filteredRestocks.reduce((acc, r) => {
-        acc[r.supplier] = (acc[r.supplier] || 0) + parseInt(r.quantity);
-        return acc;
-      }, {} as Record<string, number>)
-    ).sort(([,a], [,b]) => b - a).slice(0, 5),
-    topMedications: Object.entries(
-      filteredRestocks.reduce((acc, r) => {
-        acc[r.medication_name] = (acc[r.medication_name] || 0) + parseInt(r.quantity);
-        return acc;
-      }, {} as Record<string, number>)
-    ).sort(([,a], [,b]) => b - a).slice(0, 5)
-  };
-
-  const monthlyData = Array.from({ length: 12 }, (_, i) => {
-    const date = new Date();
-    date.setMonth(date.getMonth() - i);
-    const monthKey = date.toISOString().slice(0, 7);
-    
-    const monthRestocks = restocks.filter(r => 
-      r.date_restocked.startsWith(monthKey)
-    );
-    
-    return {
-      month: date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-      value: monthRestocks.reduce((sum, r) => sum + parseFloat(r.total_cost), 0)
     };
-  }).reverse();
+    load();
+  }, []);
 
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-6">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto" />
           <p className="mt-4 text-center">Loading analytics...</p>
         </div>
       </div>
     );
   }
 
+  if (!analytics) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6">
+          <p className="text-gray-600">Unable to load analytics.</p>
+          <button type="button" onClick={onClose} className="mt-4 px-4 py-2 bg-gray-200 rounded-lg">
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const monthlyData = (analytics.monthly_trend || []).map((row) => ({
+    month: row.month ? new Date(row.month).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—',
+    value: Number(row.total_value || 0),
+  }));
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
         <div className="bg-purple-600 text-white p-6 rounded-t-lg">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
               <BarChart3 className="mr-3" size={24} />
               <h2 className="text-2xl font-bold">Restock Analytics</h2>
             </div>
-            <button onClick={onClose} className="text-white hover:text-purple-200">
+            <button type="button" onClick={onClose} className="text-white hover:text-purple-200">
               <X size={24} />
             </button>
           </div>
         </div>
 
-        {/* Time Range Filter */}
-        <div className="p-6 border-b">
-          <div className="flex items-center space-x-4">
-            <label className="text-sm font-medium text-gray-700">Time Range:</label>
-            <select
-              value={timeRange}
-              onChange={(e) => setTimeRange(e.target.value as any)}
-              className="p-2 border rounded-lg"
-            >
-              <option value="week">Last Week</option>
-              <option value="month">Last Month</option>
-              <option value="quarter">Last Quarter</option>
-              <option value="year">Last Year</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Key Metrics */}
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <div className="bg-blue-50 p-4 rounded-lg border">
@@ -151,7 +92,7 @@ const RestockAnalytics = ({ onClose }: RestockAnalyticsProps) => {
                 <Package className="text-blue-600 mr-2" size={20} />
                 <div>
                   <p className="text-sm text-gray-600">Total Restocks</p>
-                  <p className="text-2xl font-bold">{analytics.totalRestocks}</p>
+                  <p className="text-2xl font-bold">{analytics.total_restocks}</p>
                 </div>
               </div>
             </div>
@@ -160,7 +101,7 @@ const RestockAnalytics = ({ onClose }: RestockAnalyticsProps) => {
                 <TrendingUp className="text-green-600 mr-2" size={20} />
                 <div>
                   <p className="text-sm text-gray-600">Total Quantity</p>
-                  <p className="text-2xl font-bold">{analytics.totalQuantity}</p>
+                  <p className="text-2xl font-bold">{analytics.total_quantity}</p>
                 </div>
               </div>
             </div>
@@ -169,7 +110,7 @@ const RestockAnalytics = ({ onClose }: RestockAnalyticsProps) => {
                 <DollarSign className="text-purple-600 mr-2" size={20} />
                 <div>
                   <p className="text-sm text-gray-600">Total Value</p>
-                  <p className="text-2xl font-bold">GHS {analytics.totalValue.toFixed(2)}</p>
+                  <p className="text-2xl font-bold">GHS {analytics.total_value.toFixed(2)}</p>
                 </div>
               </div>
             </div>
@@ -178,75 +119,66 @@ const RestockAnalytics = ({ onClose }: RestockAnalyticsProps) => {
                 <Calendar className="text-orange-600 mr-2" size={20} />
                 <div>
                   <p className="text-sm text-gray-600">Avg. Cost</p>
-                  <p className="text-2xl font-bold">GHS {analytics.averageCost.toFixed(2)}</p>
+                  <p className="text-2xl font-bold">GHS {analytics.average_cost.toFixed(2)}</p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Charts and Insights */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Top Suppliers */}
             <div className="bg-white p-6 rounded-lg border">
               <h3 className="text-lg font-semibold mb-4">Top Suppliers</h3>
               <div className="space-y-3">
-                {analytics.topSuppliers.map(([supplier, quantity], index) => (
-                  <div key={supplier} className="flex items-center justify-between">
+                {analytics.top_suppliers.map((row, index) => (
+                  <div key={row.supplier} className="flex items-center justify-between">
                     <div className="flex items-center">
                       <span className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium mr-3">
                         {index + 1}
                       </span>
-                      <span className="font-medium">{supplier}</span>
+                      <span className="font-medium">{row.supplier}</span>
                     </div>
-                    <span className="text-gray-600">{quantity} units</span>
+                    <span className="text-gray-600">{row.total_quantity} units</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Top Medications */}
             <div className="bg-white p-6 rounded-lg border">
               <h3 className="text-lg font-semibold mb-4">Most Restocked Medications</h3>
               <div className="space-y-3">
-                {analytics.topMedications.map(([medication, quantity], index) => (
-                  <div key={medication} className="flex items-center justify-between">
+                {analytics.top_medications.map((row, index) => (
+                  <div key={row.medication_name} className="flex items-center justify-between">
                     <div className="flex items-center">
                       <span className="w-6 h-6 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-sm font-medium mr-3">
                         {index + 1}
                       </span>
-                      <span className="font-medium">{medication}</span>
+                      <span className="font-medium">{row.medication_name}</span>
                     </div>
-                    <span className="text-gray-600">{quantity} units</span>
+                    <span className="text-gray-600">{row.total_quantity} units</span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* Monthly Trend */}
-          <div className="mt-6 bg-white p-6 rounded-lg border">
-            <h3 className="text-lg font-semibold mb-4">Monthly Restock Value Trend</h3>
-            <div className="flex items-end space-x-2 h-32">
-              {monthlyData.map((data, index) => {
-                const maxValue = Math.max(...monthlyData.map(d => d.value));
-                const height = maxValue > 0 ? (data.value / maxValue) * 100 : 0;
-                
-                return (
-                  <div key={index} className="flex-1 flex flex-col items-center">
-                    <div 
-                      className="w-full bg-purple-500 rounded-t"
-                      style={{ height: `${height}%` }}
-                    ></div>
-                    <span className="text-xs text-gray-500 mt-2 rotate-45 origin-left">
-                      {data.month}
-                    </span>
-                  </div>
-                );
-              })}
+          {monthlyData.length > 0 && (
+            <div className="mt-6 bg-white p-6 rounded-lg border">
+              <h3 className="text-lg font-semibold mb-4">Monthly Restock Value Trend</h3>
+              <div className="flex items-end space-x-2 h-32">
+                {monthlyData.map((data, index) => {
+                  const maxValue = Math.max(...monthlyData.map((d) => d.value), 1);
+                  const height = (data.value / maxValue) * 100;
+                  return (
+                    <div key={index} className="flex-1 flex flex-col items-center">
+                      <div className="w-full bg-purple-500 rounded-t" style={{ height: `${height}%` }} />
+                      <span className="text-xs text-gray-500 mt-2">{data.month}</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Recent Restocks */}
           <div className="mt-6 bg-white p-6 rounded-lg border">
             <h3 className="text-lg font-semibold mb-4">Recent Restocks</h3>
             <div className="overflow-x-auto">
@@ -261,18 +193,12 @@ const RestockAnalytics = ({ onClose }: RestockAnalyticsProps) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredRestocks.slice(0, 5).map((restock) => (
+                  {recent.map((restock) => (
                     <tr key={restock.id} className="border-b">
                       <td className="p-2">{restock.medication_name}</td>
-                      <td className="p-2">
-                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
-                          {restock.supplier}
-                        </span>
-                      </td>
+                      <td className="p-2">{restock.supplier}</td>
                       <td className="p-2">{restock.quantity}</td>
-                      <td className="p-2 font-medium">
-                        GHS {parseFloat(restock.total_cost).toFixed(2)}
-                      </td>
+                      <td className="p-2">GHS {Number(restock.total_cost).toFixed(2)}</td>
                       <td className="p-2 text-sm text-gray-600">
                         {new Date(restock.date_restocked).toLocaleDateString()}
                       </td>
@@ -288,4 +214,4 @@ const RestockAnalytics = ({ onClose }: RestockAnalyticsProps) => {
   );
 };
 
-export default RestockAnalytics; 
+export default RestockAnalytics;

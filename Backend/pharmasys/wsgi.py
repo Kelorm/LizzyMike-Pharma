@@ -11,6 +11,10 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pharmasys.settings_production')
+from pharmasys.env_loader import load_backend_env_files
+
+load_backend_env_files()
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pharmasys.settings_consolidated')
 
 application = get_wsgi_application()

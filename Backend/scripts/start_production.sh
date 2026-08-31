@@ -6,7 +6,7 @@ set -e
 echo "Starting Pharmasys Production Server..."
 
 # Set environment
-export DJANGO_SETTINGS_MODULE=pharmasys.settings_production
+export DJANGO_SETTINGS_MODULE=pharmasys.settings_consolidated
 
 # Create logs directory if it doesn't exist
 mkdir -p logs

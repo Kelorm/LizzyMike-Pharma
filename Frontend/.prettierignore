@@ -1,0 +1,17 @@
+node_modules
+build
+dist
+out
+.venv
+.env
+.env.local
+.env.*.local
+coverage
+htmlcov
+.pytest_cache
+.mypy_cache
+.next
+public
+.DS_Store
+*.log
+.git

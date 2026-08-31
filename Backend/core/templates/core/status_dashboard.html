@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LizzyMike Pharmacy - Status Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            border-bottom: 3px solid #eee;
+            padding-bottom: 20px;
+        }
+        
+        .header h1 {
+            color: #333;
+            font-size: 28px;
+        }
+        
+        .header .timestamp {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .overall-status {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 15px;
+            vertical-align: middle;
+        }
+        
+        .status-indicator.green {
+            background: #4CAF50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+        
+        .status-indicator.yellow {
+            background: #FFC107;
+            box-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
+        }
+        
+        .status-indicator.red {
+            background: #f44336;
+            box-shadow: 0 0 10px rgba(244, 67, 54, 0.5);
+        }
+        
+        .status-text {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .status-text.healthy {
+            color: #4CAF50;
+        }
+        
+        .status-text.degraded {
+            color: #FFC107;
+        }
+        
+        .status-text.unhealthy {
+            color: #f44336;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: #f8f9fa;
+            border-left: 5px solid #999;
+            border-radius: 8px;
+            padding: 20px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card.green {
+            border-left-color: #4CAF50;
+            background: #f1f8f5;
+        }
+        
+        .card.yellow {
+            border-left-color: #FFC107;
+            background: #fffef5;
+        }
+        
+        .card.red {
+            border-left-color: #f44336;
+            background: #fdf5f5;
+        }
+        
+        .card-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #666;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .card-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .card-details {
+            font-size: 12px;
+            color: #999;
+            line-height: 1.6;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .metric {
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .metric-label {
+            font-size: 12px;
+            color: #999;
+            margin-top: 5px;
+        }
+        
+        .alerts-section {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #eee;
+        }
+        
+        .alerts-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .alert-badge {
+            display: inline-block;
+            background: #f44336;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-left: 10px;
+            font-weight: bold;
+        }
+        
+        .alert-badge.warning {
+            background: #FFC107;
+            color: #333;
+        }
+        
+        .alert-item {
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid;
+            border-radius: 4px;
+            background: white;
+        }
+        
+        .alert-item.critical {
+            border-left-color: #f44336;
+            background: #fdf5f5;
+        }
+        
+        .alert-item.warning {
+            border-left-color: #FFC107;
+            background: #fffef5;
+        }
+        
+        .alert-message {
+            font-size: 14px;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .alert-type {
+            font-size: 11px;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 3px;
+        }
+        
+        .no-alerts {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+            background: #f1f8f5;
+            border-radius: 8px;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #eee;
+            text-align: center;
+            color: #999;
+            font-size: 12px;
+        }
+        
+        .refresh-info {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #e3f2fd;
+            border-radius: 4px;
+            color: #1976d2;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .header .timestamp {
+                margin-top: 10px;
+            }
+            
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .card-value {
+                font-size: 18px;
+            }
+            
+            .metric-value {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>💊 LizzyMike Pharmacy Status</h1>
+            <div class="timestamp">
+                Last updated: <strong>{{ timestamp|date:"Y-m-d H:i:s" }}</strong>
+            </div>
+        </div>
+        
+        <!-- Overall Status -->
+        <div class="overall-status">
+            <span class="status-indicator {{ overall_color }}"></span>
+            <span class="status-text {{ overall_status }}">
+                System Status: <strong>{{ overall_status|upper }}</strong>
+            </span>
+        </div>
+        
+        <!-- Refresh Info -->
+        <div class="refresh-info">
+            ⟳ This page refreshes automatically every 60 seconds
+        </div>
+        
+        <!-- Service Status Cards -->
+        <div class="grid">
+            <!-- Database -->
+            <div class="card {{ database_color }}">
+                <div class="card-title">Database</div>
+                <div class="card-value">{{ database_status|upper }}</div>
+                <div class="card-details">
+                    Size: {{ database_size }}
+                </div>
+            </div>
+            
+            <!-- Disk Space -->
+            <div class="card {{ disk_color }}">
+                <div class="card-title">Disk Space</div>
+                <div class="card-value">{{ disk_free }}</div>
+                <div class="card-details">
+                    {% if disk_status == 'unhealthy' %}
+                        ⚠️ Critical - Free space low
+                    {% elif disk_status == 'warning' %}
+                        ⚠️ Warning - Free space getting low
+                    {% else %}
+                        ✓ Adequate space available
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Cache -->
+            <div class="card {{ cache_color }}">
+                <div class="card-title">Cache/Redis</div>
+                <div class="card-value">{{ cache_status|upper }}</div>
+                <div class="card-details">
+                    Session caching system
+                </div>
+            </div>
+            
+            <!-- Backup -->
+            <div class="card {{ backup_color }}">
+                <div class="card-title">Database Backup</div>
+                <div class="card-value">{{ backup_status|upper }}</div>
+                <div class="card-details">
+                    Last: {{ last_backup }}<br>
+                    Age: {{ hours_since_backup }} hours
+                </div>
+            </div>
+        </div>
+        
+        <!-- Key Metrics -->
+        <div class="metrics-grid">
+            <div class="metric">
+                <div class="metric-value">{{ active_users }}</div>
+                <div class="metric-label">Active Users</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value">{{ active_sessions }}</div>
+                <div class="metric-label">Active Sessions</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value">{{ low_stock_count }}</div>
+                <div class="metric-label">Low Stock Items</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value">${{ daily_revenue|floatformat:2 }}</div>
+                <div class="metric-label">Today's Revenue</div>
+            </div>
+        </div>
+        
+        <!-- Alerts Section -->
+        <div class="alerts-section">
+            <div class="alerts-title">
+                🔔 Active Alerts
+                {% if alert_count > 0 %}
+                    <span class="alert-badge {% if alerts.0.severity == 'warning' %}warning{% endif %}">
+                        {{ alert_count }} Alert{% if alert_count != 1 %}s{% endif %}
+                    </span>
+                {% else %}
+                    <span class="alert-badge" style="background: #4CAF50;">All Clear</span>
+                {% endif %}
+            </div>
+            
+            {% if alerts %}
+                {% for alert in alerts %}
+                    <div class="alert-item {{ alert.severity }}">
+                        <div class="alert-message">
+                            {% if alert.type == 'low_stock' %}
+                                📦 Low Stock: {{ alert.count }} medications below minimum level
+                            {% elif alert.type == 'expiring_medications' %}
+                                ⏰ Expiring: {{ alert.count }} medications expire within 30 days
+                            {% elif alert.type == 'disk_space' %}
+                                💾 {{ alert.message }}
+                            {% elif alert.type == 'backup_status' %}
+                                💿 {{ alert.message }}
+                            {% elif alert.type == 'system_health' %}
+                                ⚙️ System: {{ alert.message }}
+                            {% else %}
+                                🔹 {{ alert.message }}
+                            {% endif %}
+                        </div>
+                        <div class="alert-type">{{ alert.type|replace:"_":" " }}</div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="no-alerts">
+                    ✓ All systems operating normally. No active alerts.
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <p>
+                LizzyMike Pharmacy Management System
+                <br>
+                <a href="/api/v1/health/" style="color: #667eea; text-decoration: none;">View JSON API</a>
+                &nbsp;|&nbsp;
+                Page auto-refreshes every 60 seconds
+            </p>
+        </div>
+    </div>
+    
+    <!-- Auto-refresh script -->
+    <script>
+        // Refresh the page every 60 seconds
+        setTimeout(function() {
+            location.reload();
+        }, 60000);
+    </script>
+</body>
+</html>

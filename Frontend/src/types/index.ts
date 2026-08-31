@@ -9,12 +9,18 @@ export interface User {
   first_name: string;
   last_name: string;
   phone?: string; // Added phone
+  is_active?: boolean;
+  date_joined?: string;
+  branches?: Array<{ id: string; code: string; name: string; is_active: boolean }>;
 }
 
 export interface Medication {
   id: string; // Changed to string
   name: string;
+  description?: string | null;
   category: string;
+  classification?: string;
+  dosage?: string;
   stock: number;
   min_stock: number;
   price: number;
@@ -160,7 +166,7 @@ export interface SaleItem {
 export interface Sale {
   id: string;  // Changed to string for UUID
   custom_id?: string;  // Short user-friendly transaction ID (e.g., SALE2501021A2B)
-  customer: string;  // Customer ID (UUID)
+  customer: string | null;  // null = walk-in
   customer_name: string; // Added name field
   date: string;
   total: number;
@@ -173,6 +179,14 @@ export interface Sale {
   notes?: string; // Added field
   applied_discounts?: Discount[]; // Added applied discounts
   loyalty_points_earned?: number; // Added loyalty points
+  created_by?: string | null;
+  created_by_name?: string | null;
+  tax_enabled?: boolean;
+  tax_name?: string;
+  tax_rate?: number | string;
+  tax_amount?: number | string;
+  discount_name?: string;
+  discount_rate?: number | string;
 }
 
 export interface ApiResponse<T> {
@@ -202,17 +216,21 @@ export interface Restock {
 // Added Notification interface
 export interface Notification {
   id: string;
-  type: 'low_stock' | 'expiry' | 'system';
+  type: 'low_stock' | 'expiry' | 'prescription' | 'system';
   message: string;
   entity_id?: string;
   entity_type?: 'medication' | 'prescription';
+  href?: string;
   read: boolean;
   created_at: string;
 }
 
 export interface MedicationFormData {
   name: string;
+  description?: string;
   category: string;
+  classification: string;
+  dosage?: string;
   stock: number;
   min_stock: number;
   price: number;
@@ -233,7 +251,8 @@ export interface CustomerFormData {
 }
 
 export interface PrescriptionFormData {
-  customer: string;  // Customer ID (UUID)
+  patient_name: string;
+  customer?: string;  // Optional linked Customer ID (UUID)
   medication: string;  // Medication ID (UUID)
   quantity_prescribed: number;
   dosage: string;
